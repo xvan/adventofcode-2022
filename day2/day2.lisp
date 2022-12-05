@@ -1,35 +1,11 @@
 (ql:quickload "fiveam")
 
-(defun permutations-b (l) 
-    (if (= (length l) 1) (list l)
-        (loop :for item in l         
-        :collect (mapcar (lambda (b) (append (list item) b)) (permutations (remove item l))))
-        ))
-
-(defmacro with-gensyms ((&rest names) &body body)
-    `(let ,(loop for n in names collect `(,n (gensym))) ,@body))
-
-
-(defmacro default-if-nil (default &body body)     
-    (with-gensyms (result-sym default-sym)
-        `(let ((,result-sym (progn ,@body)) (,default-sym ,default) ) (if ,result-sym ,result-sym ,default-sym))))
-
-
-(defun permutations (l)
-    (default-if-nil 
-            '(nil) 
-        ( apply 'nconc (loop :for item in l 
-                  :collect (mapcar (lambda (b) (append (list item) b)) (permutations (remove item l)))))))
-
 
 (defun hashpairs (keys values)
     (let ((table (make-hash-table)))
         (loop for key in keys for value in values
                   do (setf (gethash key table) value))
         table))
-
-(defun generate-keys () 
-    (mapcar (lambda (val) (hashpairs '(X Y Z) val)) (permutations '(A B C))))
 
 
 (defun split-by-one-space (string)
@@ -101,9 +77,6 @@
 
 
 
-(fiveam:test perm-1 (fiveam:is (equal '((1)) (permutations '(1)))))
-(fiveam:test perm-2 (fiveam:is (equal '((1 2) (2 1)) (permutations '(1 2)))))
-(fiveam:test perm-3 (fiveam:is (equal '((1 2 3) (1 3 2) (2 1 3) (2 3 1) (3 1 2) (3 2 1)) (permutations '(1 2 3)))))
 (fiveam:test hashpairs (fiveam:is (eql 'C (gethash 'Z (hashpairs '(X Y Z) '(A B C))))))
 (fiveam:test rfs (fiveam:is (eql 'A (read-from-string "A"))))
 (fiveam:test test-data (fiveam:is (equal '((A Y) (B X) (C Z)) (read-input "day2/test"))))
@@ -113,7 +86,7 @@
 
 
 (fiveam:test test-naive-solve (fiveam:is (= 12772 (apply-rules (apply-key (hashpairs '(X Y Z) '(A B C)) (read-input "day2/input"))))))
-(fiveam:test test-decode-solve (fiveam:is (= 12523 (apply-rules (apply-decode (read-input "day2/input"))))))
+(fiveam:test test-decode-solve (fiveam:is (= 11618 (apply-rules (apply-decode (read-input "day2/input"))))))
 
 
 ;(fiveam:test test-data (fiveam:is ((read-input "day2/test"))))
