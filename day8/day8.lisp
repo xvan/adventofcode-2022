@@ -42,21 +42,21 @@
               ))))
 
 
-(defun count-tree (tree-line)
-        (loop for tree in tree-line 
-              :when (not tree) :do (return acc)
+(defun count-tree (tree-line)        
+        (loop for tree in tree-line               
               :sum 1 :into acc
+              :when tree :do (return acc)              
               :finally (return acc)))
 
 
 (defun calc-scenic-view (arr row col)      
     (let ((hf (lambda (x) (>= x (aref arr row col) ))))
-     (destructuring-bind (rows cols) (array-dimensions arr)        
+     (destructuring-bind (rows cols) (array-dimensions arr)            
             (*
-              (count-tree (mapcar hf (reverse (loop for i from 0 below row :collect (aref arr i col)))))
-              (count-tree (mapcar hf (loop for i from (1+ row) below rows :collect (aref arr i col))))
-              (count-tree (mapcar hf (reverse (loop for i from 0 below col :collect (aref arr row i)))))
-              (count-tree (mapcar hf (loop for i from (1+ col) below cols :collect (aref arr row i))))
+              (count-tree  (mapcar hf (reverse (loop for i from 0 below row :collect (aref arr i col)))))
+              (count-tree  (mapcar hf (loop for i from (1+ row) below rows :collect (aref arr i col))))
+              (count-tree  (mapcar hf (reverse (loop for i from 0 below col :collect (aref arr row i)))))
+              (count-tree  (mapcar hf (loop for i from (1+ col) below cols :collect  (aref arr row i))))
               ))))
 
 
@@ -67,6 +67,13 @@
             :sum (loop :for col :from 0 :below cols
                         :when (not (detect-hidden arr row col)) :sum 1
                         ))))
+
+
+(defun process-array-second (arr) 
+    (destructuring-bind (rows cols) (array-dimensions arr)    
+        (apply 'max (loop :for row :from 0 :below rows
+            :collect (apply 'max (loop :for col :from 0 :below cols :collect (calc-scenic-view arr row col)))
+         ))))
 
 ;(array-total-size (list-to-2d-array  (read-input "day8/test")))
 
@@ -95,12 +102,16 @@
     (fiveam:is-true  (detect-hidden *test-forest* 3 3))
 
     (fiveam:is (equal 21 (process-array (list-to-2d-array  (read-input "day8/test")))))
-    (fiveam:is (equal 21 (process-array (list-to-2d-array  (read-input "day8/input")))))
+    (fiveam:is (equal 1854 (process-array (list-to-2d-array  (read-input "day8/input")))))
     
     (fiveam:is (equal 4 (calc-scenic-view *test-forest* 1 2)))
-    (fiveam:is (equal 8 (calc-scenic-view *test-forest* 3 3)))
+    (fiveam:is (equal 8 (calc-scenic-view *test-forest* 3 2)))
+
+    (fiveam:is (equal 8 (process-array-second (list-to-2d-array  (read-input "day8/test")))))
+    (fiveam:is (equal 527340 (process-array-second (list-to-2d-array  (read-input "day8/input")))))
     )
 
+(process-array-second *test-forest*)
 
 
 (fiveam:run! '8am-suite)
