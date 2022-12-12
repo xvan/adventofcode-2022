@@ -109,7 +109,7 @@
 
 ;(process-first (read-input "day11/input"))
 
-(process-second  (read-input "day11/test") 1000)
+;(process-second  (read-input "day11/test") 1000)
     
 
 
@@ -135,5 +135,12 @@
     
     (fiveam:is (read-input "day11/test"))
     )
+
+(fiveam:test test-process 
+    (fiveam:is (equal 10605 (process-first (read-input "day11/test"))))
+    (fiveam:is (equal 117640 (process-first (read-input "day11/input"))))
+    )
+
+
 
 (fiveam:run! '11am-suite)
