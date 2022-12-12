@@ -22,33 +22,24 @@
     (parse-integer (car (nreverse (split-by-one-char s #\Space))))
     )
 
-(defun parse-test (test true-retval false-retval) 
-    (let (
-          (divisor (split-last-is-integer test))
-          (true-rval (split-last-is-integer true-retval))
-          (false-rval (split-last-is-integer false-retval))
-          )
-        (lambda (x) (if (= 0 (rem x divisor)) true-rval false-rval))
-        )
-    )
-
 (defun load-monkey (in)
     (let* 
             (
-             (id-input (read-line in nil))
-             (items-input (read-line in nil))
-             (operation-input (read-line in nil))
-             (test-input-a (read-line in nil))
-             (test-input-b (read-line in nil))
-             (test-input-c (read-line in nil))
+             (id-input (parse-id (read-line in nil)))
+             (items-input (parse-items (read-line in nil)))
+             (operation-input (parse-operation (read-line in nil)))
+             (divisor (split-last-is-integer (read-line in nil)))
+             (true-rval (split-last-is-integer (read-line in nil)))
+             (false-rval (split-last-is-integer (read-line in nil)))
              (dummy (read-line in nil))
              )
     dummy; dummy usage
     (list 
-     :id (parse-id id-input)
-     :items (parse-items items-input)
-     :operation (parse-operation operation-input)
-     :test (parse-test test-input-a test-input-b test-input-c)
+     :id id-input
+     :items items-input
+     :operation operation-input
+     :test (lambda (x) (if (= 0 (rem x divisor)) true-rval false-rval))
+     :divisor divisor
     )))
 
 (defun read-input (file)
@@ -57,7 +48,6 @@
       collect (load-monkey in))        
         )))
 
-
 (defun report-monkeys (monkeys)    
     (loop :for n from 0 :below (length monkeys)
           :as monkey = (aref monkeys n)
@@ -65,12 +55,11 @@
     monkeys
     )
         
-
-(defun step-monkeys (monkeys lastsum divide)
+(defun step-monkeys (monkeys lastsum worry-reduction)
     ;(report-monkeys monkeys)
     (loop :for n from 0 :below (length monkeys)
               :collect (loop :while (getf (aref monkeys n) :items)
-                        :do (let ((item (floor (funcall (getf (aref monkeys n) :operation) (pop (getf (aref monkeys n) :items))) divide)))
+                        :do (let ((item (funcall worry-reduction (funcall (getf (aref monkeys n) :operation) (pop (getf (aref monkeys n) :items))))))
                             (push item (getf (aref monkeys (funcall (getf (aref monkeys n) :test) item)) :items)))
                         :sum 1
                ;:finally (report-monkeys monkeys)
@@ -83,9 +72,13 @@
     (loop for i from 0 below (length start-monkeys) collect 0)
     )
 
-(defun count-items (start-monkeys divide rounds)
+(defun calc-mod (start-monkeys)
+    (apply '* (loop for i from 0 below (length start-monkeys) collect (getf (aref start-monkeys i) :divisor))))
+
+
+(defun count-items (start-monkeys worry-reduction rounds)
 (do (     
-     (monkeys-sum (list start-monkeys (gen-zeros start-monkeys)) (apply (lambda (x y) (step-monkeys x y divide)) monkeys-sum))
+     (monkeys-sum (list start-monkeys (gen-zeros start-monkeys)) (apply (lambda (x y) (step-monkeys x y worry-reduction)) monkeys-sum))
      (n 0 (1+ n))     
      )
     ((= n rounds) (second monkeys-sum))
@@ -93,25 +86,19 @@
 
 
 (defun process-first (start-monkeys)
-    (let ((itemcount (sort (count-items start-monkeys 3 20) '>)))
-        (* (first itemcount) (second itemcount))
-        )
-    )
-
+    (let ((itemcount (sort (count-items start-monkeys (lambda (x) (floor x 3)) 20) '>)))
+        (* (first itemcount) (second itemcount))))
 
 (defun process-second (start-monkeys rounds)
-    (let ((itemcount (sort (count-items start-monkeys 1 rounds) '>)))
+    
+    (let* (
+           (numod (print (calc-mod start-monkeys)))
+           (itemcount (sort (count-items start-monkeys (lambda (x) (mod x numod)) rounds) '>))
+           )
         (print itemcount)
-        (* (first itemcount) (second itemcount))
-        )
-    )
-
+        (* (first itemcount) (second itemcount))))
 
 ;(process-first (read-input "day11/input"))
-
-;(process-second  (read-input "day11/test") 1000)
-    
-
 
 (fiveam:def-suite 11am-suite)
 (fiveam:in-suite 11am-suite)
@@ -139,8 +126,8 @@
 (fiveam:test test-process 
     (fiveam:is (equal 10605 (process-first (read-input "day11/test"))))
     (fiveam:is (equal 117640 (process-first (read-input "day11/input"))))
+    (fiveam:is (equal 2713310158  ( process-second  (read-input "day11/test") 10000 ) ))
+    (fiveam:is (equal 30616425600 ( process-second  (read-input "day11/input") 10000 ) ))
     )
-
-
 
 (fiveam:run! '11am-suite)
