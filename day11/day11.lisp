@@ -58,18 +58,16 @@
         )))
 
 
-(defun report-monkeys (monkeys)
-    (print "step")
+(defun report-monkeys (monkeys)    
     (loop :for n from 0 :below (length monkeys)
           :as monkey = (aref monkeys n)
-          :do (print (getf monkey :items)))
-    (print "proc")
+          :do (getf monkey :items))
     monkeys
     )
         
 
 (defun step-monkeys (monkeys lastsum divide)
-    (report-monkeys monkeys)
+    ;(report-monkeys monkeys)
     (loop :for n from 0 :below (length monkeys)
               :collect (loop :while (getf (aref monkeys n) :items)
                         :do (let ((item (floor (funcall (getf (aref monkeys n) :operation) (pop (getf (aref monkeys n) :items))) divide)))
@@ -101,16 +99,17 @@
     )
 
 
-(defun process-second (start-monkeys)
-    (let ((itemcount (sort (count-items start-monkeys 1 1000) '>)))
+(defun process-second (start-monkeys rounds)
+    (let ((itemcount (sort (count-items start-monkeys 1 rounds) '>)))
+        (print itemcount)
         (* (first itemcount) (second itemcount))
         )
     )
 
 
-(process-first (read-input "day11/input"))
+;(process-first (read-input "day11/input"))
 
-(process-second  (read-input "day11/test"))
+(process-second  (read-input "day11/test") 1000)
     
 
 
@@ -138,5 +137,3 @@
     )
 
 (fiveam:run! '11am-suite)
-
-(mod 2 3)
