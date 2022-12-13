@@ -78,9 +78,6 @@
                    )
               ))
 
-(defun gen-graph (map)
-    (gen-graph-coord-start map (lambda (c) (when (char= #\S (pair-ref map c)) 0) )))
-
 
 (defun mincomp (a b)
      (cond
@@ -92,22 +89,59 @@
     (sort graph 'mincomp :key (lambda (c) (getf c :distance))))
 
 (defun find-path-len (map)
+    (find-path-len-coord-start map (lambda (c) (when (char= #\S (pair-ref map c)) 0) )))
+
+
+(defun find-path-len-coord-start (map start-distance)
     (do* (
-          (graph (sort-nodes (gen-graph map))
+          (graph (sort-nodes (gen-graph-coord-start map start-distance))
                  (sort-nodes (mapcar (lambda (n) 
                                          (when (and
                                                 (member (getf n :coord) (getf current :adjacences) :test 'equal)
-                                                (mincomp next-distance (getf n :distance)))
-                                               (setf (getf n :distance) next-distance))
+                                                (mincomp  (1+ distance) (getf n :distance)))
+                                               (setf (getf n :distance) (1+ distance)))
                                          n)  (cdr graph))))                
           (current (car graph) (car graph))
-          (next-distance (1+ (getf current :distance)) (1+ (getf current :distance)))
+          (distance (getf current :distance) (getf current :distance))
           )             
-            ((getf current :goal) (getf current :distance))
+            ((getf current :goal) distance)
+            (when (not distance) (return))
+        ))
+
+(defun find-min-path (map)
+    (loop
+     with coord-weighter = (coord-weight-checker map) 
+     with root-weight = (char-to-weight #\a) 
+     for coord in (gen-coords (array-dimensions map))
+     ;for c = 0 then ( (print1+ c))
+     as path-len = nil
+     when (= root-weight (funcall coord-weighter coord)) do (setf path-len (find-path-len-coord-start map (lambda (c) (when (equal coord c) 0) )))
+     when path-len minimize path-len
+     ))
+
+
+
+(defun find-all-paths (map start-distance)
+    (do* (
+          (graph (sort-nodes (gen-graph-coord-start map start-distance))
+                 (sort-nodes (mapcar (lambda (n) 
+                                         (when (and
+                                                (member (getf n :coord) (getf current :adjacences) :test 'equal)
+                                                (mincomp  (1+ distance) (getf n :distance)))
+                                               (setf (getf n :distance) (1+ distance)))
+                                         n)  (cdr graph))))                
+          (current (car graph) (car graph))
+          (distance (getf current :distance) (getf current :distance))
+          )             
+            ((getf current :goal) distance)
+            (when (not distance) (return))
         ))
 
 
 
+;(find-min-path *test-map*)
+
+;(find-min-path (load-map "day12/input"))
 
 (fiveam:def-suite 12am-suite)
 (fiveam:in-suite 12am-suite)
@@ -129,7 +163,11 @@
 (fiveam:test test-process
     (fiveam:is (equal 31 (find-path-len *test-map*)))
     (fiveam:is (equal 447 (find-path-len (load-map "day12/input"))))
+    (fiveam:is (equal 29 (find-min-path *test-map*)))
+    ;(fiveam:is (equal 446 (find-min-path (load-map "day12/input"))))
     )
+    ;
+
     
 
 (fiveam:run! '12am-suite)
