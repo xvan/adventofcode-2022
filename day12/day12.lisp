@@ -28,10 +28,6 @@
         )
         '(())))
 
-
-(defun gen-graph (map)
-    (gen-coords (array-dimensions map)))
-
 (defun has-negative-coord (b) 
     (reduce (lambda (d e) (or d e))(mapcar #'minusp b)))
 
@@ -40,23 +36,24 @@
         (mapcar (lambda(b) (mapcar '+ coord b)) '((1 0) (-1 0) (0 1) (0 -1))) ;generate neighbour coords from kernel
         ))
 
-
-
-
-(has-negative-coord '(-1 -1))
-
-(mapcar (lambda(b) (mapcar '+ '(1 1)) b)) '((1 0) (-1 0) (0 1) (0 -1))
-
 (adjacent-coords '(0 1))
+
 (gen-graph (load-map "day12/test"))
+
+(defun gen-graph (map)
+    (gen-coords (array-dimensions map)))
 
 
 (fiveam:def-suite 12am-suite)
 (fiveam:in-suite 12am-suite)
 
-(fiveam:test test-parser     
-    (fiveam:is-true t)
-    )
+(fiveam:test test-negative-coord 
+    (fiveam:is-true (has-negative-coord '(-1 -1)))
+    (fiveam:is-true (has-negative-coord '(-1  1)))
+    (fiveam:is-true (has-negative-coord '( 1 -1)))
+    (fiveam:is-false (has-negative-coord '( 1  1)))
+    (fiveam:is-false (has-negative-coord '( 0  0)))
+        )
 
 (fiveam:test test-process 
 
