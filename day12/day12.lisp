@@ -1,7 +1,5 @@
 (ql:quickload "fiveam")
 
-
-
 (defun read-input (file)
   (with-open-file (in file)    
     (loop         
@@ -36,13 +34,29 @@
         (mapcar (lambda(b) (mapcar '+ coord b)) '((1 0) (-1 0) (0 1) (0 -1))) ;generate neighbour coords from kernel
         ))
 
-(adjacent-coords '(0 1))
+(defmacro pair-ref (arr idx)
+    `(apply #'aref (cons ,arr ,idx)))
 
-(gen-graph (load-map "day12/test"))
+(defun char-to-weight (char)
+    (char-int (cond
+     ((char-equal #\S char) #\a)
+     ((char-equal #\E char) #\z)
+     (t char))))
+
+(defun cood-weight-checker (map)
+    (lambda (coord) (char-to-weight (pair-ref map coord)) )
+
+;(adjacent-coords '(0 1))
+(defun adjacent-validator (weight-checker base-coord)
+    (lambda (adj-coord) (>= 
+                             (1+ (funcall weight-checker base-coord)) 
+                             (funcall weight-checker base-coord))))
+
 
 (defun gen-graph (map)
     (gen-coords (array-dimensions map)))
 
+(gen-graph (load-map "day12/test"))
 
 (fiveam:def-suite 12am-suite)
 (fiveam:in-suite 12am-suite)
