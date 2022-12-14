@@ -59,6 +59,42 @@
      :when (eql :good result) :sum n
      ))
 
+
+(defun flatten-and-append-divider (pairs-input divider)
+    (append divider (apply 'nconc pairs-input)))
+
+(defun decoder-key-b (pair-list)
+    (let* (
+           (divider '(((2)) ((6))))
+           (sorted (sort (flatten-and-append-divider pair-list divider) (lambda (a b) (not(eql :bad (packet-comparer a b))))))
+           )
+           (apply '* (mapcar (lambda (x) (1+ (position x sorted :test 'equal))) divider)))        
+    )
+
+(defun decoder-key-c (pair-lists)
+    (let* (
+           (divider '(((2)) ((6))))
+           (flat (flatten-and-append-divider pair-lists divider)))
+        (apply * (mapcar (lambda (c) (loop
+                                for packet in flat
+                                when (eql :bad (packet-comparer c packet)) sum 1 
+                            )) divider ))))
+
+
+(defun decoder-key (pair-lists)
+    (let* (
+           (divider '(((2)) ((6))))
+           (flat (flatten-and-append-divider pair-lists divider)))
+        (apply '* (mapcar (lambda (c) (
+                             loop for p in flat
+                                  for n = 0 then (1+ n)
+                                      do (print n)
+                                      do (print p)                                      
+                                      when (not (eql :bad (packet-comparer p c))) sum 1)) divider))
+        ))
+
+
+
 (fiveam:def-suite 13am-suite)
 (fiveam:in-suite 13am-suite)
 
@@ -74,8 +110,13 @@
     (fiveam:is (equal '((())) (parse-line "[[[]]]")))
     (fiveam:is (equal '(1 (2 (3 (4 (5 6 7)))) 8 9) (parse-line "[1,[2,[3,[4,[5,6,7]]]],8,9]")))
 
-    (fiveam:is-true (read-input "day13/test"))
     )
+
+(fiveam:test test-input
+    (fiveam:is-true (read-input "day13/test"))
+    (fiveam:is (equal '(((2)) ((6)) a b c d e f) (flatten-and-append-divider '((a b) (c d) (e f)) '(((2)) ((6))) )))    
+    )
+
 
 (fiveam:test test-comparer
     (fiveam:is (eql :equal (packet-comparer nil nil)))
@@ -96,17 +137,19 @@
     (fiveam:is (eql :good (packet-comparer '(1 1 3) '(1 2 3))))
     (fiveam:is (eql :bad (packet-comparer '(1 2 3) '(1 1 3))))
     (fiveam:is (eql :good (packet-comparer '(1 2 3) '(1 2 3 4))))   
-    (fiveam:is (eql :bad (packet-comparer '(1 2 3 4) '(1 2 3))))
-    
-    
+    (fiveam:is (eql :bad (packet-comparer '(1 2 3 4) '(1 2 3))))    
     )
 
 (fiveam:test test-process
     (fiveam:is  (equal '(:GOOD :GOOD :BAD :GOOD :BAD :GOOD :BAD :BAD) (compare-many (read-input "day13/test"))))
     (fiveam:is  (= 13 (count-good-index '(:GOOD :GOOD :BAD :GOOD :BAD :GOOD :BAD :BAD))))
     (fiveam:is  (= 5196 (count-good-index (compare-many (read-input "day13/input")))))
+    (fiveam:is  (= 140 (decoder-key (read-input "day13/test"))))
+    (fiveam:is  (= 140 (decoder-key (read-input "day13/input"))))
     )
 
+
+(read-input "day13/input")
 
 (fiveam:run! '13am-suite)
 
