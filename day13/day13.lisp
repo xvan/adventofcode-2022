@@ -18,12 +18,9 @@
           as n = (parse-integer string :start i :end j :junk-allowed t)         
           when n do (push n (car stack))
           while j
-          ;do (print (aref string j))
-          ;do (print n)
           do (cond
             ((eql #\[ (aref string j)) (push nil stack))
             ((eql #\] (aref string j)) (push (nreverse (pop stack)) (car stack))))
-          ;do (print stack)
           :finally (return (car (pop stack))))
         ))
 
@@ -71,22 +68,13 @@
 (defun flatten-and-append-divider (pairs-input divider)
     (append divider (apply 'nconc pairs-input)))
 
-(defun decoder-key-b (pair-list)
-    (let* (
-           (divider '(((2)) ((6))))
-           (sorted (sort (flatten-and-append-divider pair-list divider) (lambda (a b) (not(eql :bad (packet-comparer a b))))))
-           )
-           (apply '* (mapcar (lambda (x) (1+ (position x sorted :test 'equal))) divider)))        
-    )
-
-(defun decoder-key-c (pair-lists)
-    (let* (
-           (divider '(((2)) ((6))))
-           (flat (flatten-and-append-divider pair-lists divider)))
-        (apply * (mapcar (lambda (c) (loop
-                                for packet in flat
-                                when (eql :bad (packet-comparer c packet)) sum 1 
-                            )) divider ))))
+;(defun decoder-key (pair-list)
+;    (let* (
+;           (divider '(((2)) ((6))))
+;           (sorted (sort (flatten-and-append-divider pair-list divider) (lambda (a b) (not(eql :bad (packet-comparer a b))))))
+;           )
+;           (apply '* (mapcar (lambda (x) (1+ (position x sorted :test 'equal))) divider)))        
+;    )
 
 
 (defun decoder-key (pair-lists)
@@ -94,10 +82,7 @@
            (divider '(((2)) ((6))))
            (flat (flatten-and-append-divider pair-lists divider)))
         (apply '* (mapcar (lambda (c) (
-                             loop for p in flat
-                                  for n = 0 then (1+ n)
-                                      ;do (print n)
-                                      ;do (print p)                                      
+                             loop for p in flat                                  
                                       when (not (eql :bad (packet-comparer p c))) sum 1)) divider))
         ))
 
@@ -116,7 +101,7 @@
     (fiveam:is (equal '((4 4) 4 4) (parse-line "[[4,4],4,4]")))
     (fiveam:is (equal '((4 4) 4 4) (parse-line "[[4,4],4,4]")))
     (fiveam:is (equal '((())) (parse-line "[[[]]]")))
-    (fiveam:is (equal '(1 (2 (3 (4 (5 6 7)))) 8 9) (parse-line "[1,[2,[3,[4,[5,6,7]]]],8,9]")))
+    (fiveam:is (equal '(1 (2 (3 (4 (5 6 7)))) 8 9) (parse-line "[1,[2,[3,[4,[5,6,7]]]],8,9]")))    
 
     )
 
@@ -146,6 +131,8 @@
     (fiveam:is (eql :bad (packet-comparer '(1 2 3) '(1 1 3))))
     (fiveam:is (eql :good (packet-comparer '(1 2 3) '(1 2 3 4))))   
     (fiveam:is (eql :bad (packet-comparer '(1 2 3 4) '(1 2 3))))    
+    (fiveam:is (eql :good (packet-comparer '((6)) '((6 nil)))))
+    (fiveam:is (eql :bad (packet-comparer '((6 nil)) '((6)))))
     )
 
 (fiveam:test test-process
@@ -153,7 +140,7 @@
     (fiveam:is  (= 13 (count-good-index '(:GOOD :GOOD :BAD :GOOD :BAD :GOOD :BAD :BAD))))
     (fiveam:is  (= 5196 (count-good-index (compare-many (read-input "day13/input")))))
     (fiveam:is  (= 140 (decoder-key (read-input "day13/test"))))
-    (fiveam:is  (= 140 (decoder-key (read-input "day13/input"))))
+    (fiveam:is  (= 22134 (decoder-key (read-input "day13/input"))))
     )
 
 ;(read-input "day13/input")
