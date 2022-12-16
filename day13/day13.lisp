@@ -27,6 +27,16 @@
           :finally (return (car (pop stack))))
         ))
 
+
+(defun list-head-comparer (left right)
+    (cond
+     ((and (null left) (null right)) :equal)
+     ((null left) :good)
+     ((null right) :bad)
+     (t (packet-comparer (car left) (car right)))
+    )
+)
+
 (defun packet-comparer (left right)
     (cond
      ((equal left right) :equal)
@@ -41,12 +51,10 @@
          (do (
               (l left (cdr l))
               (r right (cdr r))
-              (test :equal (packet-comparer (car l) (car r)))
+              (test :equal (list-head-comparer l r))
               ) 
                  ((not (eql :equal test)) test)
-             )))
-)
-
+             ))))
 
 (defun compare-many (pairs-input)
     (mapcar (lambda (pair) (apply 'packet-comparer pair)) pairs-input))
@@ -88,8 +96,8 @@
         (apply '* (mapcar (lambda (c) (
                              loop for p in flat
                                   for n = 0 then (1+ n)
-                                      do (print n)
-                                      do (print p)                                      
+                                      ;do (print n)
+                                      ;do (print p)                                      
                                       when (not (eql :bad (packet-comparer p c))) sum 1)) divider))
         ))
 
@@ -148,8 +156,7 @@
     (fiveam:is  (= 140 (decoder-key (read-input "day13/input"))))
     )
 
-
-(read-input "day13/input")
+;(read-input "day13/input")
 
 (fiveam:run! '13am-suite)
 
