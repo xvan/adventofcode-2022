@@ -25,6 +25,7 @@
         ))
 
 
+
 (defun list-head-comparer (left right)
     (cond
      ((and (null left) (null right)) :equal)
@@ -63,6 +64,7 @@
      :for n = 1 :then (1+ n)
      :when (eql :good result) :sum n
      ))
+
 
 
 (defun flatten-and-append-divider (pairs-input divider)

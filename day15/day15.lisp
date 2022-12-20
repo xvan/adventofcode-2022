@@ -85,7 +85,11 @@
            (map (getf map-data :map))
            (offset (getf map-data :offset))
            (correct-offset (lambda (c) (mapcar '- c offset)))
+           (inspect (mapcar correct-offset '((11 2)(11 3)(12 2)(12 3))))
+           (canvas (mapcar correct-offset '((0 0)(0 20)(20 20)(20 0))))
            )
+        (print inspect)
+        (print canvas)
         (loop 
          for (s-coord b-coord) in lines
          for distance = (calc-distance s-coord b-coord)
@@ -93,21 +97,28 @@
             do  (loop for x from (* -1 distance) to distance
                   do (loop for y from (* -1 (- distance (abs x))) to (- distance (abs x))
                            do (setf (aref map (+ c-y y) (+ c-x x)) 4)
+                           when (member `(,(+ c-y y) ,(+ c-x x)) inspect :test 'equal ) do (print  `((,(+ c-y y) ,(+ c-x x)) ,s-coord ,b-coord))
                            )))
         (loop 
          for (s-coord b-coord) in (mapcar (lambda (l) (mapcar correct-offset l))lines)
          do (set-point map s-coord 5)
          do (set-point map b-coord 3)
          )
+            
         (print-map map)
 
-
+        (dolist (i inspect) (set-point map i 7))
+        ;(dolist (c canvas) (set-point map c 8))
+        ;(print inspect)
+        ;(print canvas)
+        (print-map map)
         (loop
          with y = (second (funcall correct-offset `(0 ,target-row)))
          for x from 0 below (array-dimension map 1)
          when (= 4 (aref map y x)) sum 1))
         )
 
+(process (parse-lines "day15/testb") 10)
 
 (defun print-map (array)
   (terpri)
@@ -205,12 +216,34 @@
                             ((,(max min-c-x max-b-x) ,max-c-x)(,(max min-c-y min-b-y) ,(min max-c-y max-b-y)))
                             ((,(max min-c-x max-b-x) ,max-c-x)(,(max min-c-y max-b-y) ,max-c-y)))))
 
-(defun crop-canvas (canvas box)            
-        (remove-if-not 
-                (lambda (box) 
-                    (destructuring-bind ((min-x max-x)(min-y max-y)) box 
-                        (and (< min-x max-x) (< min-y max-y))))
-                (generate-sub-canvas canvas box)))
+
+(defun has-intersection (canvas box)
+        (destructuring-bind (((min-c-x max-c-x)(min-c-y max-c-y)) ((min-b-x max-b-x)(min-b-y max-b-y))) (list canvas box)        
+        ( and
+         (or
+         (and (<= min-b-x min-c-x) (<= min-c-x max-b-x))
+         (and (>= max-b-x max-c-x) (>= max-c-x min-b-x))
+         (and (<= min-c-x min-b-x) (<= min-b-x max-c-x))
+         (and (>= max-c-x max-b-x) (>= max-b-x min-c-x))
+           )
+        (or
+         (and (<= min-b-y min-c-y) (<= min-c-y max-b-y))
+         (and (>= max-b-y max-c-y) (>= max-c-y min-b-y))
+         (and (<= min-c-y min-b-y) (<= min-b-y max-c-y))
+         (and (>= max-c-y max-b-y) (>= max-b-y min-c-y))
+        ))))
+
+
+(defun filter-invalid-boxes (boxes)
+    (remove-if-not (lambda (box) 
+                           (destructuring-bind ((min-x max-x)(min-y max-y)) box 
+                               (and (< min-x max-x) (< min-y max-y)))) boxes ))
+
+(defun crop-canvas (canvas box)    
+        (if (has-intersection canvas box) ; prevents uneeded split
+            (filter-invalid-boxes (generate-sub-canvas canvas box))
+            (list canvas)))
+
 
 
 (defun limits (lines)
@@ -218,31 +251,20 @@
      for (sensor beacon) in lines
      for (s-x s-y) = sensor
      for d = (calc-distance sensor beacon)
-     collect `((,(- s-x d) ,s-y ) (,(+ s-x d) ,s-y ) (,s-x ,(- s-y d)) (,s-x ,(+ s-y d)))
+     collect `((,(- s-x d) ,s-y ) (,s-x ,(- s-y d)) (,(+ s-x d) ,s-y )  (,s-x ,(+ s-y d)))
     )
 )
 
-
+(defvar SQ2 (sqrt 2))
 
 (defun rotate (coord)
     (destructuring-bind (x y) coord
-        `( ,(+ x y) ,(- x y) )
-    )
-)
-
-(defun anti-rotate (coord)
-    (destructuring-bind (a b) coord
-        `( ,(/ (+ a b) 1) ,(/ (- a b) 1) )
+        `( ,(/ (+ x y) SQ2) ,(/ (- x y) SQ2) )
     )
 )
 
 (defun rotate-all (coords)
     (mapcar (lambda (l) (mapcar 'rotate l)) coords))
-
-
-(defun anti-rotate-all (coords)
-    (mapcar (lambda (l) (mapcar 'anti-rotate l)) coords))
-
 
 (defun crop-all-canvas (box canvas)
     (mapcan (lambda(c) (crop-canvas c box)) canvas ))
@@ -259,33 +281,142 @@
 )))
 
 
+(defvar *color-a* t)
+(defun export-canvas (canvas)
+    (terpri)
+    ;(dolist (c canvas) (export-one-canvas c (if *color-a* "m" "y")) )
+    (setf *color-a* (not *color-a*))
+
+    ;(reduce (lambda (a b) (and a b)) (mapcar (lambda (c) (contains c *target-r*)) canvas))
+    
+    canvas
+)
+
+(defun export-one-canvas (canvas color)
+    (format t "~{v = patch_coords(~{~{~a,~a,~}~{~a,~a~}~}); fill(v(:,1),v(:,2),'~a')~}~%" (list canvas color) )
+    )
+
+(defun export-box (box)
+    (print "box")
+    (export-one-canvas box "b")
+    box )
+
+
+(defvar *target-r* (rotate '(14 11)))
 (defun process-e (lines)
     (let* (
-           (rotated (rotate-all (limits lines)))
-           (target-r (rotate '(14 11)))
+           (rotated (rotate-all (limits-2 lines)))           
            )           
         (do (
              (boxes (mapcar 'minmax rotated) (cdr boxes) ) 
-             (canvas (list (minmax (apply 'append rotated))) (crop-all-canvas (car boxes) canvas))
+             (canvas (export-canvas (list (minmax (apply 'append rotated)))) (export-canvas  (crop-all-canvas (car boxes) canvas)))
+             (n 0 (1+ n))
             )
-            ((null boxes) canvas)
-            (print (reduce (lambda (a b) (and a b)) (mapcar (lambda (c) (contains c target-r)) canvas)))
-            (print (car boxes))
-            (print target-r)
+            ((null boxes) canvas)                        
+            
+            ;(print "next>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+            ;(export-box (car boxes))
+            
 )))
 
-
-(process-e (parse-lines "day15/test"))
-
 (defun contains (box coord)
-     (destructuring-bind (((min-b-x max-b-x)(min-b-y max-b-y)) (c-x c-y)) (list box coord)
-        (and (<= min-b-x c-x) (<= c-x max-b-x) (<= min-b-y c-y) (<= c-y max-b-y))
+     ;(destructuring-bind (((min-b-x max-b-x)(min-b-y max-b-y)) (c-x c-y)) (print (list box coord)) (print (and (<= min-b-x c-x) (<= c-x max-b-x) (<= min-b-y c-y) (<= c-y max-b-y))))
+    )
+
+
+(defun box-to-coords (box)
+    (destructuring-bind ((min-b-x max-b-x)(min-b-y max-b-y)) box
+            `((,min-b-x ,min-b-y)
+              (,min-b-x ,max-b-y)
+              (,max-b-x ,max-b-y)
+              (,max-b-x ,min-b-y)
+              )
     ))
 
-(anti-rotate-all (process-d (parse-lines "day15/test")))
+(defun coords-to-box (coords)
+    (minmax coords)
+    )
 
-(crop-all-canvas '((0 80)(0 80)) (anti-rotate-all (process-d (parse-lines "day15/test"))))
+(defun anti-rotate (coord)
+    (destructuring-bind (a b) coord
+        `( ,(/ (+ a b) SQ2) ,(/ (- a b) SQ2) )
+    )
+)
 
+(defun anti-rotate-box (box) 
+    (coords-to-box (mapcar 'anti-rotate (box-to-coords box)))
+    )
+
+(defun anti-rotate-all (boxes)
+    (mapcar 'anti-rotate-box boxes))
+
+(defun crop-box-to-canvas-size (box size-box)
+    (destructuring-bind (((min-b-x max-b-x)(min-b-y max-b-y)) ((min-sb-x max-sb-x)(min-sb-y max-sb-y))) (list box size-box)
+        `((,(max min-b-x min-sb-x) ,(min max-b-x max-sb-x))
+          (,(max min-b-y min-sb-y) ,(min max-b-y max-sb-y)))))
+
+
+(anti-rotate-box '((24 26) (2 4)))
+
+(defun crop-all-boxes (boxes size-box)
+    (mapcar (lambda(b) (crop-box-to-canvas-size b size-box)) boxes ))
+
+
+(defvar *all-boxes* (process-e (parse-lines "day15/test")))
+;(anti-rotate-box (box-to-coords '((24 26) (2 4))))
+
+(coord-to-freq (mapcar 'round (calc-centroid (car (filter-invalid-boxes (crop-all-boxes (anti-rotate-all (process-e (parse-lines "day15/test"))) '((0 20)(0 20))))))))
+
+
+(coord-to-freq (mapcar 'round (calc-centroid (car (filter-invalid-boxes (crop-all-boxes (anti-rotate-all (process-e (parse-lines "day15/input"))) '((0 4000000)(0 4000000))))))))
+
+(defun calc-centroid (box)
+    (mapcar (lambda(c)(/ (apply '+ c) 2)) box ))
+
+
+
+(dolist  (box (filter-invalid-boxes (crop-all-boxes (anti-rotate-all *all-boxes*) '((0 40)(0 40)))))     
+    (export-one-canvas box "y")
+    )
+
+
+
+(filter-invalid-boxes (crop-all-boxes (anti-rotate-all (process-e (parse-lines "day15/input"))) '((0 8000000)(0 8000000))))
+
+(defun duplicate (lims)
+        (mapcar (lambda (d) (mapcar (lambda(c) (mapcar (lambda (a) (* 2 a)) c)) d )) lims ))
+
+
+(defun format-lines (lines)
+;(format t "~{~{fill(~{[~a ~a ~a ~a]~},~{[~a ~a ~a ~a]~},'m')~}~%~}~%"  (mapcar (lambda (r) `(,(mapcar 'second r),(mapcar 'first r)))   lines))
+    )
+
+
+
+(defun limits-2 (lines)
+    (loop      
+     for (sensor beacon) in lines
+     for (s-x s-y) = sensor
+     for d = (calc-distance sensor beacon)
+     collect `((,(- s-x d 0.5) ,s-y ) (,s-x ,(- s-y d 0.5)) (,(+ s-x d 0.5) ,s-y )  (,s-x ,(+ s-y d 0.5)))
+    )
+)
+
+
+
+
+;(format-lines (duplicate (limits-2 (parse-lines "day15/test"))))
+;(format-lines (list (mapcar 'rotate (box-to-coords '((0 20)(0 20))))))
+;(format-lines (rotate-all (limits-2 (parse-lines "day15/test"))))
+
+;(crop-all-canvas '((0 80)(0 80)) (anti-rotate-all (process-d (parse-lines "day15/test"))))
+
+
+
+
+
+
+(rotate-all (anti-rotate *target-r*))
 
 (ql:quickload "fiveam")
 
@@ -324,6 +455,9 @@
     (fiveam:is (equal '(((0 2) (0 4))) (crop-canvas '((0 4)(0 4)) '((2 5)(0 4))))) ;Crop right side
     (fiveam:is (equal '(((0 4) (2 4))) (crop-canvas '((0 4)(0 4)) '((0 4)(-1 2))))) ;Crop up
     (fiveam:is (equal '(((0 4) (0 2))) (crop-canvas '((0 4)(0 4)) '((0 4)(2 5))))) ;Crop down
+    (fiveam:is (equal '(((24 26) (2 26))) (crop-canvas '((24 26)(-6 26)) '((22 30)(-6 2)) ))) ;Crop up no margin
+
+     
     (fiveam:is (equal '(((0 2) (0 2)) ((0 2) (3 4)) ((2 4) (0 2)) ((2 4) (2 3)) ((2 4) (3 4))) (crop-canvas '((0 4)(0 4)) '((0 2)(2 3))))) ;Crop Middle Left
     (fiveam:is (equal '(((0 4) (0 2)) ((0 4) (3 4))) (crop-canvas '((0 4)(0 4)) '((-1 5)(2 3))))) ;split in two halves
     )
