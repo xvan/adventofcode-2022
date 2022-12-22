@@ -173,9 +173,98 @@
         (step-process (remove-if (lambda(c)(= 0 (getf c :rate))) resolved) (list (car resolved)) graph-arr 30)      
         ))
 
+(defun struct-input (input)
+    (let* (
+           (resolved (resolve-symbols input))
+           (graph-arr (make-graph resolved))           
+           (candidates (remove-if (lambda(c)(= 0 (getf c :rate))) resolved))
+           (start-node (car resolved))           
+           )
+        (list :graph graph-arr :candidates candidates :start-node start-node)
+    ))
+
+
+
+
+(defun make-calc-remaining (graph)
+    (lambda (from-node to-node time)
+        (let*
+        ((from-id (getf from-node :id))
+         (to-id  (getf to-node :id))        
+         (consumed-time (1+ (aref graph from-id to-id)))
+         (remaining-time (- time consumed-time))
+        )
+            remaining-time
+        )))
+
+(defun calc-reward (node time)
+    (* (getf node :rate) (max 0 time)))
+
+(defun make-bound-tester (calc-remaining-lambda)
+    (lambda (step-state)
+         (destructuring-bind (&key node reward candidates time &allow-other-keys)  step-state
+                (loop
+                    for candidate in candidates
+                    for remaining-time = (funcall calc-remaining-lambda node candidate time)                    
+                        sum (calc-reward candidate remaining-time) into reward-bound
+                    finally (return (+ reward-bound reward))
+                ))))
+
+
+(defun make-step-plist (node reward candidates time)
+    (list :node node :reward reward :candidates candidates :time time))
+
+(defun make-next-leaves-lambda (graph)
+    (let* ((calc-remaining-lambda (make-calc-remaining graph))
+           (bound-tester-lambda (make-bound-tester calc-remaining-lambda))           
+           )
+        (lambda (step-state)
+            (destructuring-bind (&key node reward candidates time)  step-state                
+                (loop                 
+                 for candidate in candidates                 
+                 for remaining-candidates =  (remove-if (lambda(y)(equal candidate y)) candidates )
+                 for remaining-time = (funcall calc-remaining-lambda node candidate time)
+                 for candidate-reward = (+ reward (calc-reward candidate remaining-time))
+                 for candidate-step = (make-step-plist candidate candidate-reward remaining-candidates remaining-time)
+                 for candidate-ub = (funcall bound-tester-lambda candidate-step)
+                 collect (make-leaf candidate-step candidate-ub)
+                 )
+            )
+        )
+    )
+)
+
+
+(defun make-leaf (step ub)
+    (list :step step :ub ub))
+
+(defun process-bb (input)
+(destructuring-bind (&key graph candidates start-node &allow-other-keys) (struct-input input)  
+    (let* (
+           (next-leaves-lambda (make-next-leaves-lambda graph))
+           (start-step (make-step-plist start-node 0 candidates 30))
+           ;(leaves (list start-step))
+            )
+            (do* (                 
+                 (best-path most-negative-fixnum)
+                 (leaves (list))
+                 (current-step start-step (getf (pop leaves) :step))
+                 (n 0 (1+ n))
+                 ) 
+                ((null current-step) (list best-path n))
+                (setf leaves (nconc leaves (funcall next-leaves-lambda current-step)))                
+                (setf best-path   (apply 'max (cons best-path (mapcar (lambda(l) (getf (getf l :step ) :reward)) leaves ))))
+                (delete-if (lambda (l) (> best-path (getf l :ub)))leaves)
+                (sort leaves '> :key (lambda (l) (getf l :ub)))
+                )              
+            )))
+           
+
+(process-bb (parse-file "day16/test"))
+
 (process (parse-file "day16/test"))
 
-(process (parse-file "day16/input"))
+(process-bb (parse-file "day16/input"))
 
 ;(make-array '(4 4) :initial-contents '((0 1 1 2) (1 0 1 1) (1 1 0 1) (2 1 1 0)) ) 
 
