@@ -86,93 +86,6 @@
     ))
     
 
-(defun step-process-old (resolved visited graph time)
-    (loop 
-     with from-id = (getf (car visited) :id)
-     for row in resolved
-     for to-id = (getf row :id)
-     for remain = (remove-if (lambda(y)(= to-id (getf y :id))) resolved )
-     for consumed-time = (1+ (aref graph from-id to-id))
-     for remaining-time = (- time consumed-time)
-     for rate = (getf row :rate)
-     for reward = (* remaining-time rate)
-     for pseudo-current = (cons row visited)     
-     maximize (+ reward (step-process remain pseudo-current graph remaining-time))
-    )
-)
-
-(defun process-old (input)
-    (let* (
-           (resolved (resolve-symbols input))
-           (graph-arr (make-graph resolved))
-           )
-           (step-process-old (remove-if (lambda(c)(= 0 (getf c :rate))) resolved) (list (car resolved)) graph-arr 30)
-        ))
-
-(defun step-costs (resolved visited graph time)
-    (loop 
-     with from-id = (getf (car visited) :id)
-     for row in resolved
-     for to-id = (getf row :id)
-     ;for remain = (remove-if (lambda(y)(= to-id (getf y :id))) resolved )
-     for consumed-time = (1+ (aref graph from-id to-id))
-     for remaining-time = (- time consumed-time)
-     for rate = (getf row :rate)
-     for reward = (* remaining-time rate)
-     ;for pseudo-current = (cons row visited)     
-     collect `( :reward ,reward :remaining ,remaining-time :from-id ,from-id :to-id ,to-id :row ,row)
-    )
-)
-
-(defun compare-remaining-time (a b)
-    (cond ((> (getf a :remaining) (getf b :remaining)) t )
-          ((< (getf a :remaining) (getf b :remaining)) nil )
-          (t (>= (getf a :reward)    (getf b :reward)) )          
-          ))
-
-(defun compare-reward (a b)
-    (cond ((> (getf a :reward) (getf b :reward)) t )
-          ((< (getf a :reward) (getf b :reward)) nil )
-          (t (>= (getf a :remaining) (getf b :remaining)))
-          ))
-
-(print "hello")
-(defun step-candidates (resolved visited graph time) 
-    (let* ((costs (step-costs resolved visited graph time))
-           (costs-by-time (sort (copy-seq costs) 'compare-remaining-time ))
-           (costs-by-reward (sort (copy-seq costs) 'compare-reward ))
-          )
-          (cond
-           ((null costs) nil)
-           ((equal (car costs-by-reward) (car costs-by-time)) (list (car costs-by-reward)))
-           (t (remove-duplicates (append
-             (subseq costs-by-reward 0 (position (car costs-by-reward) costs-by-time :test 'equal))
-             (subseq costs-by-time 0 (position (car costs-by-time) costs-by-reward :test 'equal)))))
-          )))
-
-(defun step-process (resolved visited graph time)
-    (loop
-     for candidate in (step-candidates resolved visited graph time)
-     for remain = (remove-if (lambda(y)(= (getf candidate :to-id) (getf y :id))) resolved )
-     for pseudo-current = (cons (getf candidate :row) visited)
-     for reward = (getf candidate :reward)
-     for remaining-time = (getf candidate :remaining)
-     do (incf *global-count*)
-     maximize (+ reward (step-process remain pseudo-current graph remaining-time))
-     )
-)
-
-(defvar *global-count* 0)
-
-(defun process (input)
-    (let* (
-           (resolved (resolve-symbols input))
-           (graph-arr (make-graph resolved))
-           )
-        (setf *global-count* 0)
-        (step-process (remove-if (lambda(c)(= 0 (getf c :rate))) resolved) (list (car resolved)) graph-arr 30)      
-        ))
-
 (defun struct-input (input)
     (let* (
            (resolved (resolve-symbols input))
@@ -182,8 +95,6 @@
            )
         (list :graph graph-arr :candidates candidates :start-node start-node)
     ))
-
-
 
 
 (defun make-calc-remaining (graph)
@@ -202,33 +113,41 @@
 
 (defun make-bound-tester (calc-remaining-lambda)
     (lambda (step-state)
-         (destructuring-bind (&key node (reward 0) candidates (time 0) &allow-other-keys)  step-state
+         (destructuring-bind (&key workers (reward 0) candidates &allow-other-keys)  step-state
                 (loop
                     for candidate in candidates
-                    for remaining-time = (funcall calc-remaining-lambda node candidate time)                    
+                    for remaining-time = (apply 'max (mapcar (lambda (w) 
+                                          (destructuring-bind (&key node time &allow-other-keys) w
+                                            (funcall calc-remaining-lambda node candidate time))) workers))
                         sum (calc-reward candidate remaining-time) into reward-bound
                     finally (return (+ reward-bound reward))
                 ))))
 
+(defun make-worker-plist (node time previous)
+    (list :node node :time time :previous previous) )
 
-(defun make-step-plist (node reward candidates time previous)
-    (list :node node :reward reward :candidates candidates :time time :previous previous))
+(defun make-step-plist (workers reward candidates)
+    (list :workers workers :reward reward :candidates candidates))
 
 (defun make-next-leaves-lambda (graph)
     (let* ((calc-remaining-lambda (make-calc-remaining graph))
            (bound-tester-lambda (make-bound-tester calc-remaining-lambda))           
            )
         (lambda (step-state)
-            (destructuring-bind (&key node (reward 0) candidates (time 0) &allow-other-keys)  step-state                
-                (loop                 
-                 for candidate in candidates                 
-                 for remaining-candidates =  (remove-if (lambda(y)(equal candidate y)) candidates )
-                 for remaining-time = (funcall calc-remaining-lambda node candidate time)
-                 for candidate-reward = (+ reward (calc-reward candidate remaining-time))
-                 for candidate-step = (make-step-plist candidate candidate-reward remaining-candidates remaining-time step-state)
-                 for candidate-ub = (funcall bound-tester-lambda candidate-step)
-                 collect (make-leaf candidate-step candidate-ub)
-                 )
+            (destructuring-bind (&key workers (reward 0) candidates &allow-other-keys)  step-state
+                (destructuring-bind (&key node (time 0) &allow-other-keys) (car workers)
+                    (loop                 
+                        for candidate in candidates                 
+                        for remaining-candidates =  (remove-if (lambda(y)(equal candidate y)) candidates )
+                        for remaining-time = (funcall calc-remaining-lambda node candidate time)
+                        for candidate-reward = (+ reward (calc-reward candidate remaining-time))                                            
+                        for new-worker = (make-worker-plist candidate remaining-time nil) ;(car workers)                     
+                        for new-workers = (sort (append (list new-worker) (copy-list (cdr workers))) '> :key (lambda (w) (getf w :time)))
+                        for candidate-step = (make-step-plist new-workers candidate-reward remaining-candidates)
+                        for candidate-ub = (funcall bound-tester-lambda candidate-step)
+                        collect (make-leaf candidate-step candidate-ub)                     
+                    )
+                )
             )
         )
     )
@@ -238,11 +157,12 @@
 (defun make-leaf (step ub)
     (list :step step :ub ub))
 
-(defun process-bb (input)
+(defun process-bb (input start-time n-workers)
 (destructuring-bind (&key graph candidates start-node &allow-other-keys) (struct-input input)  
     (let* (
            (next-leaves-lambda (make-next-leaves-lambda graph))
-           (start-step (make-step-plist start-node 0 candidates 30 nil))
+           (start-worker (make-worker-plist start-node start-time nil))
+           (start-step (make-step-plist (make-list n-workers :initial-element start-worker) 0 candidates))
            (ub-key (lambda (l) (getf l :ub)))
            ;(leaves (list start-step))
             )
@@ -254,20 +174,18 @@
                  (n 0 (1+ n))
                  ) 
                 ((null current-step) (list best-path n best-step))
-                
+                ;(print current-step)
                 (setf leaves
                     (merge 'list leaves 
                        (sort (funcall next-leaves-lambda current-step) '> :key ub-key)
                        '> :key ub-key))
-
+                ;(print (list :leaves leaves))
 
                 (let ((best-leave (when leaves (reduce (lambda (a b) (if (> (getf (getf b :step ) :reward) (getf (getf a :step ) :reward)) b a)) leaves ))))
                     (when (and best-leave (> (getf (getf best-leave :step) :reward) best-path))
-                        ;(print best-leave)
                         (setf best-step (getf best-leave :step) )
                         (setf best-path (getf best-step :reward) )      
-                    )
-                                    
+                    )                                    
                 )
                     (setf leaves (subseq leaves 0 (position-if (lambda (l) (> best-path (getf l :ub))) leaves)))
                 ))
@@ -285,7 +203,7 @@
     ))
 
 
-;(show-result (process-bb (parse-file "day16/input")))
+;(show-result (process-bb (parse-file "day16/test") 30 1))
 
 (defun make-graphviz (input)
     (format t "~{<node id='~a'/>~%~}" (mapcar (lambda (x) (getf x :valve)) input))
@@ -296,6 +214,7 @@
 
 ;(make-array '(4 4) :initial-contents '((0 1 1 2) (1 0 1 1) (1 1 0 1) (2 1 1 0)) ) 
 
+(process-bb (parse-file "day16/input") 26 2)
 
 (ql:quickload "fiveam")
 
@@ -312,12 +231,12 @@
 )
 
 (fiveam:test test-process
-    (fiveam:is (= 1651 (first (process-bb (parse-file "day16/test")))))
-    (fiveam:is (= 2087 (first (process-bb (parse-file "day16/input")))))
-    ;(fiveam:is (equal 1651 (process (parse-file "day16/test"))))
+    (fiveam:is (= 1651 (first (process-bb (parse-file "day16/test") 30 1))))
+    (fiveam:is (= 2087 (first (process-bb (parse-file "day16/input") 30 1))))    
+    (fiveam:is (= 1651 (first (process-bb (parse-file "day16/test") 30 2))))
+    ;warining slow
+    ;(fiveam:is (= 2591 (first (process-bb (parse-file "day16/input") 30 2))))
     
-    ;(first (process-bb (parse-file "day16/input")))
-    ;(fiveam:is (equal 1651 (process (parse-file "day16/input"))))
 )
 
 (fiveam:run! '16am-suite)
