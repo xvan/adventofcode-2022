@@ -202,7 +202,7 @@
 
 (defun make-bound-tester (calc-remaining-lambda)
     (lambda (step-state)
-         (destructuring-bind (&key node reward candidates time &allow-other-keys)  step-state
+         (destructuring-bind (&key node (reward 0) candidates (time 0) &allow-other-keys)  step-state
                 (loop
                     for candidate in candidates
                     for remaining-time = (funcall calc-remaining-lambda node candidate time)                    
@@ -219,7 +219,7 @@
            (bound-tester-lambda (make-bound-tester calc-remaining-lambda))           
            )
         (lambda (step-state)
-            (destructuring-bind (&key node reward candidates time &allow-other-keys)  step-state                
+            (destructuring-bind (&key node (reward 0) candidates (time 0) &allow-other-keys)  step-state                
                 (loop                 
                  for candidate in candidates                 
                  for remaining-candidates =  (remove-if (lambda(y)(equal candidate y)) candidates )
@@ -271,7 +271,7 @@
                 )
                     (setf leaves (subseq leaves 0 (position-if (lambda (l) (> best-path (getf l :ub))) leaves)))
                 ))
-    ))              
+    ))          
 
 
 (defun show-result (result)
@@ -284,21 +284,15 @@
         )        
     ))
 
-(show-result (process-bb (parse-file "day16/test")))
 
-(process (parse-file "day16/test"))
-
-(show-result (process-bb (parse-file "day16/input")))
-
-
-
+;(show-result (process-bb (parse-file "day16/input")))
 
 (defun make-graphviz (input)
     (format t "~{<node id='~a'/>~%~}" (mapcar (lambda (x) (getf x :valve)) input))
     (format t "~{~{<edge source='~a' target='~a'/>~%~}~}"(apply 'append (mapcar (lambda (x) (mapcar (lambda (y) (list (getf x :valve) y)) (getf x :neighbours) ) ) input)))    
     )
 
-(make-graphviz (parse-file "day16/input"))
+;(make-graphviz (parse-file "day16/input"))
 
 ;(make-array '(4 4) :initial-contents '((0 1 1 2) (1 0 1 1) (1 1 0 1) (2 1 1 0)) ) 
 
@@ -318,7 +312,11 @@
 )
 
 (fiveam:test test-process
+    (fiveam:is (= 1651 (first (process-bb (parse-file "day16/test")))))
+    (fiveam:is (= 2087 (first (process-bb (parse-file "day16/input")))))
     ;(fiveam:is (equal 1651 (process (parse-file "day16/test"))))
+    
+    ;(first (process-bb (parse-file "day16/input")))
     ;(fiveam:is (equal 1651 (process (parse-file "day16/input"))))
 )
 
