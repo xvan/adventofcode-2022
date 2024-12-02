@@ -1,14 +1,14 @@
 (ql:quickload "fiveam")
 
 
-; (defconstant test_data 
-; '((7 6 4 2 1)
-; (1 2 7 8 9)
-; (9 7 6 2 1)
-; (1 3 2 4 5)
-; (8 6 4 4 1)
-; (1 3 6 7 9))
-; )
+(defvar *test_data*
+'((7 6 4 2 1)
+(1 2 7 8 9)
+(9 7 6 2 1)
+(1 3 2 4 5)
+(8 6 4 4 1)
+(1 3 6 7 9))
+)
 
 
 (defun read-input (file)
@@ -61,21 +61,26 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(print (safe-reports (read-input "2024/day2/input")))
+(print (safe-reports-with-tolerance (read-input "2024/day2/input")))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (fiveam:test load-successfully
   (fiveam:is (equal 
-              test_data
+              *test_data*
               (read-input "2024/day2/test_input"))))
 
 
 (fiveam:test check-safe-successfully
   (fiveam:is (equal 
               '(t nil nil nil nil t)              
-               (mapcar #'is-safe test_data))))
+               (mapcar #'is-safe *test_data*))))
 
 (fiveam:test sum-safe-successfully
   (fiveam:is (equal 
               2
-              (safe-reports test_data))))
+              (safe-reports *test_data*))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -83,19 +88,18 @@
 (fiveam:test check-safe-with-tolerance-successfully
   (fiveam:is (equal 
               '(t nil nil t t t)              
-               (mapcar #'is-safe-with-tolerance test_data))))
+               (mapcar #'is-safe-with-tolerance *test_data*))))
 
 
 (fiveam:test sum-safe-with-tolerance-successfully
   (fiveam:is (equal 
               4
-              (safe-reports-with-tolerance test_data))))
+              (safe-reports-with-tolerance *test_data*))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (fiveam:run!)
 
 
-(safe-reports (read-input "2024/day2/input"))
-(safe-reports-with-tolerance (read-input "2024/day2/input"))
 
 
 
