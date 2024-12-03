@@ -21,9 +21,9 @@
 
 (code-char 41)
 
-(defun parse (stack state &optional (acc 0))
+(defun parse (stack state &optional (acc 0) )
   (+ acc (if stack 
-             (case state
+             (case (print state)
               ((nil) (if (eq (car stack) #\m) (parse (cdr stack) 'm) (parse (cdr stack) nil)))
               (m (if (eq (car stack) #\u) (parse (cdr stack) 'mu ) (parse stack nil)))
               (mu (if (eq (car stack) #\l) (parse (cdr stack) 'mul ) (parse stack nil)))
@@ -39,10 +39,10 @@
                           )))
               (fd2 (if (char-digit (car stack)) (parse stack 'd2) (parse stack nil)))
               (d2
-              (let* ( (v (char-digit (car stack)))
+                (let* ( (v (char-digit (car stack)))
                       (new-op (when v (+ v (* 10 acc)))))                
                     (cond
-                        ((eq (car stack) #\,) (parse (cdr stack) 'fd2))                   
+                        ((eq (car stack) (code-char 40)) (parse (cdr stack) 'fd2))                   
                         ( (and new-op (< new-op 1000)) (parse (cdr stack) 'd2 new-op))
                         (t (parse stack nil))
                         )))
@@ -51,11 +51,7 @@
               )
      ))
 
-
-
-                          (if (and new-acc (< new-acc 1000)) ))
-
-(parse (str-to-list  "umul(xxmul()") nil)
+(parse (str-to-list  "mul(1,2)") nil)
 
 
 (defun boolean-to-integer (value)
