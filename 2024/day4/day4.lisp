@@ -1,5 +1,3 @@
-(ql:quickload "fiveam")
-
 (defun str-to-list (str)
 (loop :for c :across str :collect c))
 
@@ -17,10 +15,7 @@
 
 
 (defvar *test_data* (read-input "2024/day4/test_input"))
-
-
-
-
+(defvar *test_data2* (read-input "2024/day4/test_input2"))
 
 
 (defun rot-left(n l)
@@ -47,13 +42,6 @@
         ))))
 
 
-
-(print *test_data*)
-(print (rot-45 (print *test_data*)))
-
-
-(print (rot+45 (print *test_data*)))
-
 (find-xmas (rot-45 *test_data*))
 ;
 (defun find-xmas (input)
@@ -74,56 +62,40 @@
 )))
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+(defun list-to-2d-array (list)
+  (make-array (list (length list)
+                    (length (first list)))
+              :initial-contents list))
+
+(find-xmas2 (list-to-2d-array *test_data2*))
+
+
+(defun find-xmas2 (input)
+  (loop :for x :from 0 :below (array-dimension  input 0) :sum
+  (loop :for y :from 0 :below (array-dimension  input 1)
+    
+    :count (ignore-errors (and 
+                          (eq #\A  (aref input x y))
+                          (find (list (aref input (1- x) (1- y)) (aref input (1+ x) (1+ y))) '((#\M #\S) (#\S #\M)) :test #'equal)
+                          (find (list (aref input (1+ x) (1- y)) (aref input (1- x) (1+ y))) '((#\M #\S) (#\S #\M)) :test #'equal)
+                  )))))
+     ;;(and (eq #\A  (aref input x y)) ( search (print (list (aref input (1- x) (1- y)) (aref input (1+ x) (1+ y)))) '((#\M #\S) (#\S #\M)) :test #'equal)
+
+
+(find-xmas2 (list-to-2d-array (read-input "2024/day4/input")))
+
+
+(loop for tt in (find-xmas2 (list-to-2d-array *test_data2*))  :count ( find tt '((#\M #\S) (#\S #\M)) :test #'equal))
+
+
 (find-xmas (read-input "2024/day4/test_input"))
 (find-xmas (read-input "2024/day4/input"))
 
-(parse (str-to-list  "mul(123,123)") nil)
-(parse (str-to-list  *test_data*) nil)
-(parse (str-to-list  *test_data2*) nil t t)
-(parse (read-input2 "2024/day4/test_input") nil)
-
-(parse (read-input2 "2024/day4/input") nil)
-(parse (read-input2 "2024/day4/input") nil t t)
-
-
-(defun boolean-to-integer (value)
-  (if value 1 0))
-
-(defun safe-reports (data)
-  (apply #'+ (mapcar #'boolean-to-integer (mapcar #'is-safe data))))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;(print (safe-reports (read-input "2024/day3/input")))
-;;(print (safe-reports-with-tolerance (read-input "2024/day3/input")))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-; (fiveam:test load-successfully
-;   (fiveam:is (equal 
-;               *test_data*
-;               (read-input "2024/day3/test_input"))))
-
-
-(fiveam:test parser-end-condition
-  (fiveam:is (equal 
-              nil              
-              (parse () 'm))))
-
-(fiveam:test parser-one-mul
-  (fiveam:is (equal 
-              6
-              (parse (str-to-list  "mul(2,3)") 'm))))
-
-(fiveam:test parser-advance-no-match
-  (fiveam:is (equal 
-              nil              
-              (parse (str-to-list  "abc") 'm))))
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(fiveam:run!)
+
 
 
 
