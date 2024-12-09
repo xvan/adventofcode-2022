@@ -1,4 +1,4 @@
-(ql:quickload "lla")
+;;(ql:quickload "lla")
 
 (defun read-input (file)
   (with-open-file (in file)
@@ -62,15 +62,16 @@
 
 (defun solve-first (filename)
 (destructuring-bind (rules manuals) (read-input filename)    
-    (let ((connectivity (find-all-paths (create-connectivity rules))))
+    (let 
+        ;;((connectivity (find-all-paths (create-connectivity rules))))
+        ((connectivity (create-connectivity rules)))
     (loop :for manual in manuals
           :when (every #'identity ( mapcar (lambda (x y) (> (aref connectivity x y) 0)) manual (cdr manual)))
           :sum (nth (floor (length manual) 2) manual)
           )
     )  ))
 
-(solve-first "2024/day5/test_input")
-(solve-first "2024/day5/input")
+
 
 (defun matrix-multiply (a b)
   (let* ((rows-a (array-dimension a 0))
@@ -91,3 +92,33 @@
 
 *test-m2*
 (matrix-multiply *test-m2* *test-m2*)
+
+
+(defun solve-second (filename)
+(destructuring-bind (rules manuals) (read-input filename)    
+    (let* 
+        ;;((connectivity (find-all-paths (create-connectivity rules))))
+        ((connectivity (create-connectivity rules))
+         (predicate  (lambda (x y) (> (aref connectivity x y) 0)))        
+        )          
+    (loop :for manual in manuals
+          :when (notevery #'identity ( mapcar predicate manual (cdr manual)))                 
+          :sum (nth (floor (length manual) 2) (sort manual predicate))
+          )
+    )  ))
+
+
+(defun test-copy ()
+(let* ((subj #2A((1 2 3)(3 5 6)))
+       (cp  (copy-seq subj))
+         ) subj)
+  
+)
+
+
+(test-copy)
+
+(solve-first "2024/day5/test_input")
+(solve-second "2024/day5/test_input")
+(solve-first "2024/day5/input")
+(solve-second "2024/day5/input")
