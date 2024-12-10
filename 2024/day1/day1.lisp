@@ -36,6 +36,9 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(sort-diff-sum (read-input "2024/day1/input"))
+(apply #'similarity-score (read-input "2024/day1/input"))
+
 (fiveam:test load-successfully
   (fiveam:is (equal 
               '((3 4 2 1 3 3) (4 3 5 3 9 3))
@@ -66,3 +69,91 @@
 
 (sort-diff-sum (read-input "2024/day1/input"))
 (apply #'similarity-score (read-input "2024/day1/input"))
+
+ 
+
+
+(ql:quickload "str")
+
+(defun solve-01-a ()
+  (let* ((input-lines (uiop:read-file-lines #p"2024/day1/input"))
+         (pairs (mapcar (lambda (line) (str:split " " line :omit-nulls t)) input-lines))
+         (left-list ())
+         (right-list ())
+         (sorted-left)
+         (sorted-right))
+    (dolist (item pairs)
+      (push (parse-integer (first item)) left-list)
+      (push (parse-integer (second item)) right-list))
+    (setf sorted-left (sort left-list #'<))
+    (setf sorted-right (sort right-list #'<))
+    (reduce #'+ (mapcar (lambda (l r) (abs (- l r))) sorted-left sorted-right))))
+
+
+(solve-01-a)
+
+(defun solve-01-b ()
+  (let* ((input-lines (uiop:read-file-lines #p"2024/day1/input"))
+         (pairs (mapcar (lambda (line) (str:split " " line :omit-nulls t)) input-lines))
+         (left-list ())
+         (right-list ())
+         (cache (make-hash-table :test 'equal)))
+    (dolist (item pairs)
+      (push (parse-integer (first item)) left-list)
+      (push (parse-integer (second item)) right-list))
+    (loop for left in left-list
+          unless (nth-value 1 (gethash left cache))
+            do (setf (gethash left cache) (count left right-list))
+          sum (* left (gethash left cache)))))
+
+(solve-01-b)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(ql:quickload :cl-ppcre)
+(ql:quickload :split-sequence)
+(ql:quickload :lisp-utils)
+(ql:quickload :alexandria)
+
+(use-package :lisp-utils)
+
+(defun parse (lines)
+  (let ((list0 nil)
+        (list1 nil))
+    (dolist (line lines)
+      (let ((chunks (cl-ppcre:split "\\s+" line)))
+        (push (parse-integer (first chunks)) list0)
+        (push (parse-integer (second chunks)) list1)))
+    (list (sort list0 #'<)
+          (sort list1 #'<))))
+
+(defun compute-diffs (list0 list1)
+  (loop for i0 in list0
+        for i1 in list1
+        collecting (abs (- i0 i1))))
+
+(defun part1 (file-name)
+  (let ((lines (uiop:read-file-lines file-name)))
+    (destructuring-bind (list0 list1) (parse lines)
+      (apply #'+ (compute-diffs list0 list1)))))
+
+(defun part2 (file-name)
+  (let ((lines (uiop:read-file-lines file-name))
+        (count-occurrences (memoize (lambda (num lst)
+                                      (count num lst)))))
+    (destructuring-bind (list0 list1) (parse lines)
+      (apply #'+ (mapcar (lambda (num)
+                           (let ((occurrences (funcall count-occurrences num list1)))
+                             (* num occurrences)))
+                         list0)))))
+
+(print (part1 "2024/day1/input"))
+(print (part1 "input1.txt"))
+
+(print (part2 "input0.txt"))
+(print (part2 "input1.txt"))
+
+
+(with-open-file (stream "2024/day1/test_input")
+  (format t "~a~%" (read-line stream)))

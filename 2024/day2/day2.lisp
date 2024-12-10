@@ -25,6 +25,7 @@
                   ) )))
 
 
+
 (defun is-safe (test_line)
 (let* (( diff_line (mapcar #'- test_line (cdr test_line))        
   ))
