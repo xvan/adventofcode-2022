@@ -44,56 +44,55 @@
       )
   )
 
-; (defun next-file (blocks idx)
-;   (loop
-;     :with file-end := (loop :for cur :downfrom idx :to 0 :when (aref blocks cur) :return cur)
-;     :for cur :from file-end :downto 0
-;     :when (not (eq (aref blocks cur) (aref blocks file-end)))
-;       :return (list (1+ cur) (1+ file-end))
-;     :finally (return (list 0 (1+ file-end)))
-;    )
-; )
-
 (defun next-file (blocks idx)
-  (progn
-  (print (format nil "next-file called with idx: ~A" idx))
   (loop
-    :with file-end := (print (loop :for cur :downfrom idx :to 0 :when (aref blocks cur) :return cur))
-    :for cur :from file-end :downto 0
+    :with file-end := (loop :for cur :downfrom idx :to 0 :when (aref blocks cur) :return cur)
+    :for cur :from file-end :downto 0    
     :when (not (eq (aref blocks cur) (aref blocks file-end)))
-      :do (print (format nil "Returning: (~A ~A)" (1+ cur) (1+ file-end)))
-      :return (list (1+ cur) (1+ file-end))    
-   ))
+      :return (list (1+ cur) (1+ file-end))
+    :finally (return (list 0 (1+ file-end)))
+   )
 )
+
+; (defun next-file (blocks idx)
+;   (progn
+;   (print (format nil "next-file called with idx: ~A" idx))
+;   (loop
+;     :with file-end := (print (loop :for cur :downfrom idx :to 0 :when (aref blocks cur) :return cur))
+;     :for cur :from file-end :downto 0
+;     :do (sleep 1)
+;     :when (not (eq (aref blocks cur) (aref blocks file-end)))
+;       :do (print (format nil "Returning: (~A ~A)" (1+ cur) (1+ file-end)))
+;       :return (list (1+ cur) (1+ file-end))        
+;    ))
+; )
 
 
 
 (defun next-empty-range (blocks idx limit)
   (loop
    :with empty-start := (loop :for cur :from idx :to limit :unless (aref blocks cur) :return cur)
-   :for cur :from  empty-start :below limit
-   :for end :from empty-start
-   :until (aref blocks cur)    
-   :finally (return (list empty-start end))
+   :for end :from  (or empty-start limit) :below limit   
+   :until (aref blocks end)    
+   :finally (return (list (or empty-start end) end))
   ))
 
 (defun find-empty-range (blocks limit n)
   (loop
    :for (ecur eend) := (next-empty-range blocks 0 limit) :then (next-empty-range blocks eend limit)
-   :while (> n (- eend ecur))
+   :while (and  (> n (- eend ecur)) (< eend limit))
    :finally (return (list ecur eend))
    ))
  
 
-
-(next-empty-range #(nil nil 3 3 3 nil nil nil 3 3 3) 2 100)
-
 (defun defrag-files (blocks)
   (loop
-   :for (fcur fend) := (print (next-file blocks (1- (length blocks)))) :then (print (next-file blocks (1- fcur)))
-   :for (ecur eend) := (print (find-empty-range blocks fcur   (- fend fcur))  )
-   :until (= 0 (print fcur))
-   :when (print (>= (- eend ecur)  (- fend fcur)))
+   :for (fcur fend) := (next-file blocks (1- (length blocks))) :then (next-file blocks (1- fcur))
+   :for (ecur eend) := (find-empty-range blocks fcur   (- fend fcur))
+   :until (= 0 fcur)
+   
+   ;:do (format t "~%>>>>>>>>>> symbol:~A fcur:~A, fend:~A, ecur:~A, eend:~A" (aref blocks fcur) fcur fend ecur eend)   
+   :when  (>= (- eend ecur)  (- fend fcur))
    :do 
     ;;(print (list (list ecur eend) (list fcur fend)))
     ;;(print (loop :for i :from fcur :below fend :collect (aref blocks i)))
@@ -101,7 +100,7 @@
       :for i :from fcur :below fend
       :for j :from ecur :below eend
       :do (swap-array-values blocks i j)
-      :finally (print blocks)            
+      :finally (return  blocks)
       )
    :finally (return blocks)
    )
@@ -118,12 +117,18 @@
   (let ((blocks (explode-blocks (read-diskmap file))))
     (cond 
      ((= n 1) (calc-checksum (defrag-blocks blocks)))
-     ((= n 2) (defrag-files (print blocks)));(next-file (print blocks) 4))
+     ((= n 2) (calc-checksum (defrag-files blocks)));(next-file (print blocks) 4))
        )))
 
+
+;(untrace next-empty-range)
+;(trace find-empty-range)
+;(untrace next-empty-range)
+;(untrace next-file)
 
 (solve "2024/day9/test_input" 1)
 (solve "2024/day9/input" 1)
 
 (solve "2024/day9/test_input" 2)
-;;(solve "2024/day9/input" 2)
+(solve "2024/day9/input" 2)
+
