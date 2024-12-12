@@ -42,15 +42,18 @@
       :sum (recursive-solve (blink1 rock) (1- n)))
   ))
   
+(count-rocks ( update-catbag (INIT-CATBAG '("125" "17"))))
 
+(solve-second '("125" "17") 25)
 
 (defun init-catbag (rocks)
   
     (loop 
      :with catbag := (make-hash-table :test 'equalp)
      :for rock :in rocks
-     :do (incf (gethash rock catbag 0)))     
-    )
+     :do (incf (gethash rock catbag 0))
+     :finally (return catbag) 
+    ))
 
 (defun update-catbag (catbag)
   (let ((new-catbag (make-hash-table :test 'equalp)))
@@ -64,17 +67,13 @@
 (defun count-rocks (catbag)
   (let ((cnt 0))
     (maphash (lambda (k v) (incf cnt v)) catbag)
-    cnt
-    )
-  )
+    cnt))
 
 (defun solve-second (rocks n)
 (loop
     :for catbag := (init-catbag rocks) :then (update-catbag catbag)
     :for i :from 0 :below n
-    :finally (count-rocks catbag)
-   )
-)
+    :finally (return (count-rocks catbag))))
 
 (defun deduplicate (l)
   (let ((hash (make-hash-table :test 'equal))
@@ -91,7 +90,7 @@
   (let ((rocks (read-input file)))
     (cond 
      ((= n 1) (length (solve-first rocks)))
-     ((= n 2) (solve-second rocks 25))
+     ((= n 2) (solve-second rocks 75))
     )))
 
 ;(untrace next-empty-range)
@@ -103,8 +102,9 @@
 ;(solve-first (read-input "2024/day11/test_input1" ))
 
 ;(solve "2024/day11/test_input0" 1)
-(solve "2024/day11/test_input1" 1)
-(solve "2024/day11/input" 1)
+
+;(solve "2024/day11/test_input1" 1)
+;(solve "2024/day11/input" 1)
 
 (solve "2024/day11/test_input1" 2)
-(solve "2024/day11/input" 2)
+(time (solve "2024/day11/input" 2))
