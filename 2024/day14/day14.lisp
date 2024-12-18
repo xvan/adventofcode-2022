@@ -65,14 +65,32 @@
 (defun solve-second (robots dim)
   (setf *print-right-margin* 40)
   
-  (loop :for x :from 0 :below 10000
+  (loop :for x :from 50 :below (apply #'* dim) :by (first dim)
         :for mapa :=  (generate-map dim (evolve robots x dim ))
-        :when t; (search-tree mapa)
-        :do (progn (print x)
-            (print (transform-map mapa))
-            (sleep 0.5))
+          :do (save-map-as-pbm (format nil "/tmp/mapas/~5,'0d.pbm" x) mapa))
+
+  (loop :for x :from 95 :below (apply #'* dim) :by (second dim)
+        :for mapa :=  (generate-map dim (evolve robots x dim ))
+          :do (save-map-as-pbm (format nil "/tmp/mapas/~5,'0d.pbm" x) mapa)
+        ; :when t; (search-tree mapa)
+        ; :do (progn (print x)
+        ;     (print (transform-map mapa))
+        ;     (sleep 0.5))
   )
   )
+
+(defun save-map-as-pbm (filename mapa)
+  (with-open-file (out filename :direction :output :if-exists :supersede :if-does-not-exist :create)
+    (let ((width (array-dimension mapa 1))
+          (height (array-dimension mapa 0)))
+      ;; Write PBM header
+      (format out "P1~%")
+      (format out "~d ~d~%" width height)
+      ;; Write PBM data
+      (loop :for x :from 0 :below height
+            :do (loop :for y :from 0 :below width
+                      :do (format out "~a " (if (> (aref mapa x y) 0) 1 0)))
+            (format out "~%")))))
 
 
 
@@ -85,13 +103,14 @@
    :finally (return (not (> cnt 2)))
   ))
 
-(solve-first (read-input "2024/day14/test_input0") '(7 11) )
-(solve-second (read-input "2024/day14/test_input0") '(7 11) )
+; (solve-first (read-input "2024/day14/test_input0") '(7 11) )
+; (solve-second (rec 3ad-input "2024/day14/test_input0") '(7 11) )
 
-(solve-first (read-input "2024/day14/input" ) '(103 101))
+; (solve-first (read-input "2024/day14/input" ) '(103 101))
 (solve-second (read-input "2024/day14/input" ) '(103 101))
 
-(solve-second (read-input "2024/day14/test_input0"))
-(solve-second (read-input "2024/day14/input"))
+; (solve-second (read-input "2024/day14/test_input0"))
+; (solve-second (read-input "2024/day14/input"))
+
 
 
