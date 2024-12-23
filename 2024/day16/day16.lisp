@@ -52,7 +52,7 @@
       :do 
       (when vn (setf (gethash (list coord 'v) graph nil) (mapcar (lambda (c) (list (list c 'v) 1)) vn)))
       (when hn (setf (gethash (list coord 'h) graph nil) (mapcar (lambda (c) (list (list c 'h) 1)) hn)))
-      (when (and vn hn)
+      (when t ;(and vn hn)
             (push (list (list coord 'v) 1000) (gethash (list coord 'h) graph))
             (push (list (list coord 'h) 1000) (gethash (list coord 'v) graph))
             )
@@ -90,28 +90,19 @@
       (loop 
         :for (node distance) :in (gethash (first leaves) graph)
         :for (v-distance v-list v-processed) := (gethash node visited nil)
-        :when (and (not v-processed) (not (or v-distance (< v-distance proc-distance))))
-        :do ()
+        :for candidate-distance := (+ proc-distance distance)
+        :when (and (not v-processed) (not (and v-distance (<  candidate-distance v-distance ))))
+        :do 
+          (setf (gethash node visited nil) (list candidate-distance (cons (list proc-node distance) proc-stack) nil))
+          ;(print node)
+          ;(print (gethash node visited nil))
       )
+     :finally (return (gethash 'E visited))
+    )))
 
-    )
-    )  
-  )
 
-(defun load-orign (mapa)
-  (loop :named outer
-        :with rows := (array-dimension mapa 0)
-        :with cols := (array-dimension mapa 1) 
-                   :for x :from 0 :below rows
-                    :do (loop :for y :from 0 :below cols
-                    :when (eq (aref mapa x y) #\@)
-                      :do (return-from outer (list x y))
-            )))
 
-(defun clone-2d-array (array)
-  (let ((rows (array-dimension array 0))
-        (cols (array-dimension array 1)))
-    (make-array (list rows cols)
-                :initial-contents (loop :for i :below rows
-                                        :collect (loop :for j :below cols
-                                                       :collect (aref array i j))))))
+(find-exit (build-graph (parse-input "2024/day16/test_input0")))
+(find-exit (build-graph (parse-input "2024/day16/test_input1")))
+(find-exit (build-graph (parse-input "2024/day16/input")))
+
