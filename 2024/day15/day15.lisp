@@ -189,8 +189,8 @@
 ; (untrace clear-many)
 ; (untrace step-many)
 
-(time (solve-tiles "2024/day15/test_input0" #'parse-input nil ))
-(time (solve-tiles "2024/day15/test_input1" #'parse-input nil ))
-(time (solve-tiles "2024/day15/input" #'parse-input nil))
-(time (solve-tiles "2024/day15/test_input1" #'parse-input2 nil))
-(time (solve-tiles "2024/day15/input" #'parse-input2 nil))
+; (time (solve-tiles "2024/day15/test_input0" #'parse-input nil ))
+; (time (solve-tiles "2024/day15/test_input1" #'parse-input nil ))
+; (time (solve-tiles "2024/day15/input" #'parse-input nil))
+; (time (solve-tiles "2024/day15/test_input1" #'parse-input2 nil))
+(time (solve-tiles "2024/day15/input" #'parse-input2 t))
