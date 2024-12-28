@@ -88,60 +88,111 @@
      :do
       (setf (gethash proc-node visited) (list proc-distance proc-stack t))
       (loop 
-        :for (node distance) :in (gethash (first leaves) graph)
+        :for (node distance) :in (gethash proc-node graph)
         :for (v-distance v-list v-processed) := (gethash node visited nil)
         :for candidate-distance := (+ proc-distance distance)
-        :when (and (not v-processed) (not (and v-distance (<  candidate-distance v-distance ))))
+        ;:for debug_data := (format t "node:~a parent:~a processed:~a vdistance:~a cdistance:~a eval:~a~%" node proc-node v-processed v-distance candidate-distance (and (not v-processed) (not (and v-distance (<  candidate-distance v-distance )))))
+        :when (or (not v-processed) (not v-distance) (>  v-distance candidate-distance  ))
         :do 
           (setf (gethash node visited nil) (list candidate-distance (cons (list proc-node distance) proc-stack) nil))
           ;(print node)
-          ;(print (gethash node visited nil))
+          ;(print (list node (gethash node visited nil)))
+          ;(format t "node:~a cost:~a parent:~a~%" node (car (gethash node visited nil)) (caadr (gethash node visited nil)))
       )
      :finally (return visited)
     )))
 
+(find-shortest-paths (build-graph (parse-input "2024/day16/pain2")))
 
+(defvar *pain_visit*
+ (find-shortest-paths (build-graph (parse-input "2024/day16/pain")))
+)
+
+(defvar *pain_visit2*
+ (find-shortest-paths (build-graph (parse-input "2024/day16/pain2")))
+)
 (defun solve-first (file) 
  (first (gethash 'E (find-shortest-paths (build-graph (parse-input file)))))
  )
 
+ (gethash '((2 5) V) *pain_visit*)
+
+;(remove-if-not (lambda (x) (< (third x) current-cost))  )
+
+;(mapcar (lambda (x) (nconc neighbours (gethash (first x) visited))) 
+
+(defun extended-distance (n)
+  (+ (second (first n)) (first (second n)))
+  )
 
 (defun backtrack-paths (graph visited node)
   (let* ((current-cost (first (gethash node visited)) )
-         (candidates (remove-if-not (lambda (x) (< (second x) current-cost)) (mapcar (lambda (x) (cons x (gethash x visited))) (mapcar #'first (gethash node graph)))))
-         (next-min (if candidates (apply #'min (mapcar #'second candidates)) -1))
-         (chosen (remove-if-not (lambda (x) (= (second x) next-min)) candidates))
+         (neighbours (gethash node graph))
+         (extended-neighbours (mapcar (lambda (x) (list x (gethash (first x) visited))) neighbours))
+         (candidate-neighbours (remove-if-not (lambda (x) (< (first (second x)) current-cost)) extended-neighbours))
+         (next-min (if candidate-neighbours (apply #'min (mapcar #'extended-distance candidate-neighbours)) -1))
+         (chosen (remove-if-not (lambda (x) (= (extended-distance x) next-min)) candidate-neighbours))
+         
       )
-    ;(print current-cost)
-    ;(print  (mapcar (lambda (c) (list (first c) (second c))) candidates))
-    ;(print (length chosen))
+    ; (format t "current cost: ~a~%" current-cost)
+    ; (format t "neighbours: ~a~%" neighbours)
+    ; (format t "extended-neighbours: ~a~%" (mapcar (lambda (x) (list (caar x) (caadr x))) extended-neighbours))
+    ; (format t "candidate-neighbours: ~a~%"candidate-neighbours)
+    ; (format t "chosen: ~a~%" chosen)
     (loop :for chosen-node in chosen
-      :append (mapcar (lambda (x) (cons node x)) (backtrack-paths graph visited (first chosen-node))) :into all-paths
-      :finally (return (print (if all-paths all-paths (list (list node))))))
+       :append (mapcar (lambda (x) (cons node x)) (backtrack-paths graph visited (caar chosen-node))) :into all-paths
+       :finally (return  (if all-paths all-paths (list (list node)))))
   ))
 
+(defun array-to-list (array)
+  (loop :for i :below (array-dimension array 0)
+        :collect (loop :for j :below (array-dimension array 1)
+                       :collect (aref array i j))))
+
+(defun savetxt (filename mapa)
+    (with-open-file (out filename :direction :output :if-exists :supersede :if-does-not-exist :create)
+    (format out "~{~{~a~}~%~}" (array-to-list mapa))    
+  ))
+
+
+
 (defun solve-second (file) 
-(let* ((graph (build-graph (parse-input file)))
+(let* ((mapa (parse-input file))
+       (graph (build-graph mapa))
        (shortest-paths  (find-shortest-paths graph))
        (winning-path (second (gethash 'E shortest-paths)))
-       (end-node (caar winning-path))
+       (end-node (caar (cdr winning-path)))
+       (paths (backtrack-paths graph shortest-paths end-node))
+       (reduced-paths (mapcar (lambda (path) (reverse (reduce (lambda (x y) (adjoin y x :test #'equalp)) path :key #'first :initial-value nil ))) paths))
+       (joint-paths (reduce (lambda (x y) (union x y :test #'equalp)) reduced-paths))
       )
-    
-    (backtrack-paths graph shortest-paths end-node)
- 
- ))
+    ; (format t "path: ~a~%" paths)
+    ; (format t "redu: ~a~%" reduced-paths)
+    ; (format t "join: ~a~%" joint-paths)
+    ;(format t "pathlen ~a~%" (first (gethash 'E shortest-paths)))
+    ;(loop :for coord :in (get-pain) :do (setf (aref-2d mapa coord) #\X))
+    (loop :for coord :in joint-paths :do (setf (aref-2d mapa coord) #\O))
+    (savetxt "2024/day16/output-p2" mapa)
+    (1+ (length joint-paths))
+    ))
 
-(solve-second "2024/day16/test_input0")
+(untrace backtrack-paths)
+;(untrace backtrack-paths)
+;(solve-second "2024/day16/test_input0")
+;(solve-second "2024/day16/test_input1")
+;(solve-second "2024/day16/input-mod")
 (solve-second "2024/day16/input")
+(solve-second "2024/day16/pain")
+;(solve-second "2024/day16/input-short")
+;(solve-second "2024/day16/input-short")
+; (solve-first "2024/day16/test_input0")
+; (solve-first "2024/day16/test_input1")
+;(solve-first "2024/day16/input")
 
-(solve-first "2024/day16/test_input0")
-(solve-first "2024/day16/test_input1")
-(solve-first "2024/day16/input")
 
 
 
-
-(find-exit (build-graph (parse-input "2024/day16/test_input0")))
-(find-exit (build-graph (parse-input "2024/day16/test_input1")))
+;(find-exit (build-graph (parse-input "2024/day16/test_input0")))
+;(find-exit (build-graph (parse-input "2024/day16/test_input1")))
 ;(find-exit (build-graph (parse-input "2024/day16/input")))
 
