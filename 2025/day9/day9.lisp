@@ -66,36 +66,51 @@
 ;outside '(2 12)
 
 (defun segment-contained (coord filtered-range firstk)            
-      (print (list "segment-contained"))
-      (print filtered-range)
+      (identity (list "segment-contained"))
+      (identity filtered-range)
       (find (funcall firstk coord) filtered-range :key #'(lambda (x) (funcall firstk (first x))))
       )
 
-(defun is-internal (coord filtered-range firstk)
+(defun is-internal (coord filtered-range firstk secondk)
       ;(print (list "calc odd" (funcall firstk coord) ))
-      (oddp ( length (print (remove-if-not #'(lambda (x) (> (funcall firstk coord) x)) filtered-range :key #'(lambda (x) (funcall firstk  (first x)) ))))
-      ))
+      (let* (
+             (crossed-segments (remove-if-not #'(lambda (x) (> (funcall firstk coord) x)) filtered-range :key #'(lambda (x) (funcall firstk  (first x)) )))
+             (crossed-corners  (remove-if-not #'(lambda (x) (some #'(lambda (y) (= (funcall secondk coord) (funcall secondk y))) x)) crossed-segments))
+             )
+            
+            (identity (list "firstk coord" (funcall firstk coord)))
+            (identity (list "crossed-segments" crossed-segments))
+            (identity (list "crossed-corners" crossed-corners))
+            (oddp (- (length crossed-segments)(floor (length crossed-corners) 2)))      
+            )      
+      )
+
+
 
 
 (defun is-inside (coord segments firstk secondk)      
-      (print (list firstk secondk))
+      (identity (list firstk secondk))
       (let ((filtered-range (remove-if-not #'(lambda (x) 
                              (in-range  (funcall secondk coord) (funcall secondk (first x)) (funcall secondk (second x)))) 
                              (funcall secondk segments))))
             ;(print filtered-range)            
              (or 
-             (segment-contained coord filtered-range firstk)
-             (is-internal coord filtered-range firstk))
+             (segment-contained (funcall coord-validator '(9 1))coord filtered-range firstk)
+             (is-internal coord filtered-range firstk secondk))
              
             )
       )
 
-(defun test-xy (coord segments)
-      (print (list "testing coord" coord))
-      (and
-       (print (is-inside coord segments #'first  #'second))
-       (print (is-inside coord segments #'second #'first ))
-       ))
+(defun test-xy (coord segments cache)
+      (identity (list "testing coord" coord))
+      (multiple-value-bind (value key-exists-p) (gethash coord cache)
+      (if key-exists-p
+          value
+          (setf (gethash coord cache) 
+            (and
+            (identity (is-inside coord segments #'first  #'second))
+            (identity (is-inside coord segments #'second #'first ))
+            )))))
 
 
 
@@ -113,21 +128,34 @@
                 :for y :from (first cornersy) :upto (second cornersy)
                 :collect (list x y)))) 
 
-(defun is-valid (corners segments) 
-      (print (list "testing candidate" corners))
-      (every #'(lambda (c) (test-xy c segments)) (generate-coords corners)))
+(defun is-valid (corners segments cache coord-validator) 
+      (identity (list "testing candidate" corners))
+      (every #'(lambda (c) (test-xy c segments cache)) (remove-if-not coord-validator (generate-coords corners))))
+
+(defun generate-coord-validator (data)
+      (loop
+       :with hashx := (make-hash-table )
+       :with hashy := (make-hash-table )
+       :for coord :in data
+       :do (setf (gethash (first coord) hashx) t)       
+       :do (setf (gethash (second coord) hashy) t)
+       :finally (return (lambda (c) (and (gethash (first c) hashx) (gethash (second c) hashy))))
+      )
+)
 
 (defun problem2 (path)
       (let* (
              (data (read-input path))
+             (coord-validator (generate-coord-validator data))
              (segments (sort-segments data))
-             )
-                        
-            (print segments)
-            ;(find-if #'(lambda (candidate) (is-valid candidate segments)) (get-candidates data) :key #'second)
+             (cache (make-hash-table :test 'equal))
+             )             
             
+            ;(identity segments)
+            (find-if #'(lambda (candidate) (is-valid candidate segments cache coord-validator)) (get-candidates data) :key #'second)            
       ; (list
-              (test-xy '(7 4) segments)
+      ;        (remove-if-not coord-validator '((7 4) (11 1) (9 1)))
+      ;        (test-xy '(7 4) segments)
       ;        (test-xy '(3 4) segments)
       ;        (test-xy '(12 4) segments)
       ;        (test-xy '(4 2) segments)
@@ -139,5 +167,5 @@
 
 
 
-(problem2 "2025/day9/test_input")
+;(problem2 "2025/day9/test_input")
 (problem2 "2025/day9/input")
