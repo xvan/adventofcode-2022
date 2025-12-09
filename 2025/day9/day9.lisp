@@ -95,7 +95,7 @@
                              (funcall secondk segments))))
             ;(print filtered-range)            
              (or 
-             (segment-contained (funcall coord-validator '(9 1))coord filtered-range firstk)
+             (segment-contained coord filtered-range firstk)
              (is-internal coord filtered-range firstk secondk))
              
             )
@@ -119,40 +119,102 @@
       )
 
 
-(defun generate-coords (corners)      
-      (loop 
-       :with cornersx := (sort (mapcar #'first corners) #'< )
-       :with cornersy := (sort (mapcar #'second corners) #'< )            
-       :for x :from (first cornersx) :upto (second cornersx)
-       :append ( loop
-                :for y :from (first cornersy) :upto (second cornersy)
-                :collect (list x y)))) 
+(defun generate-rectangle-coords (corners coord-tics)
+      coord-tics      
+      (let* (
+             (cornersx (sort (mapcar #'first corners) #'< ))
+             (cornersy (sort (mapcar #'second corners) #'< ))     
+             (coordsx (remove-if-not #'(lambda (x) (in-range x (first cornersx) (second cornersx))) (first coord-tics)))
+             (coordsy (remove-if-not #'(lambda (y) (in-range y (first cornersy) (second cornersy))) (second coord-tics)))              
+      )
+      (generate-coord-mesh (list coordsx coordsy)))       
+      )
 
-(defun is-valid (corners segments cache coord-validator) 
+
+(defun is-valid (corners cache coord-tics) 
       (identity (list "testing candidate" corners))
-      (every #'(lambda (c) (test-xy c segments cache)) (remove-if-not coord-validator (generate-coords corners))))
+      (every #'(lambda (c) (gethash c cache)) (generate-rectangle-coords corners coord-tics)))
 
-(defun generate-coord-validator (data)
+(defun generate-coord-tics (data)
       (loop
        :with hashx := (make-hash-table )
        :with hashy := (make-hash-table )
        :for coord :in data
        :do (setf (gethash (first coord) hashx) t)       
        :do (setf (gethash (second coord) hashy) t)
-       :finally (return (lambda (c) (and (gethash (first c) hashx) (gethash (second c) hashy))))
+       :finally (return (list                    
+                  (sort (loop for key being the hash-keys of hashx collect key) #'< )
+                  (sort (loop for key being the hash-keys of hashy collect key) #'< )
+                   ))
       )
 )
+
+(defun generate-coord-mesh (coord-tics)
+      (loop 
+       :with xcoords := (first coord-tics)
+       :with ycoords := (second coord-tics)
+       :for x :in xcoords
+       :append (loop :for y :in  ycoords :collect (list x y))
+      )
+)
+
+(defun generate-filled-cache (reduced-coords segments)
+      (let ((cache (make-hash-table :test 'equal)))
+      ( loop 
+             :for c :in reduced-coords  
+             :do ( setf (gethash c cache) (test-xy c segments cache)) 
+             :finally (return cache)             
+             )
+      ))
+
+
+(defun save-map-as-pgm (filename cache square coord-tics)
+  square
+  coord-tics
+  (with-open-file (out filename :direction :output :if-exists :supersede :if-does-not-exist :create)
+    (let ((width (length (first coord-tics)))
+          (height (length (second coord-tics)))
+                  )
+      ;; Write PBM header
+      (format out "P2~%")
+      (format out "~d ~d~%" width height)
+      (format out "3~%")
+      ;; Write PBM data
+      (loop 
+            :for yc :in (second coord-tics)
+            :for y :from 0
+            :do (loop 
+                  :with rc := (generate-rectangle-coords square coord-tics)
+                  :for xc :in (first coord-tics)
+                  :for x :from 0
+                      :do (format out "~a " 
+                      (cond
+                       ( (not (gethash (list xc yc) cache)) 3)
+                       ( (find (list xc yc) rc :test #'equalp) 2)
+                       ( t 0)))
+                      
+            (format out "~%"))))))
 
 (defun problem2 (path)
       (let* (
              (data (read-input path))
-             (coord-validator (generate-coord-validator data))
+             (coord-tics (generate-coord-tics data))             
+             (reduced-coords (generate-coord-mesh coord-tics))
+             ;(coord-validator (lambda (c) (and (gethash (first c) (first coord-hash)) (gethash (second c) (second coord-hash)))))
              (segments (sort-segments data))
-             (cache (make-hash-table :test 'equal))
+             (cache (generate-filled-cache  reduced-coords segments))
              )             
             
+            ;(loop :for c :in reduced-coords :do (print (list c (gethash c cache))))
+            (print "termine")
+            ;(length reduced-coords)
             ;(identity segments)
-            (find-if #'(lambda (candidate) (is-valid candidate segments cache coord-validator)) (get-candidates data) :key #'second)            
+            (save-map-as-pgm "2025/day9/test.pgm" cache 
+                             (second (find-if #'(lambda (candidate) (is-valid candidate cache coord-tics)) (get-candidates data) :key #'second)) 
+                             coord-tics)
+            
+            
+
       ; (list
       ;        (remove-if-not coord-validator '((7 4) (11 1) (9 1)))
       ;        (test-xy '(7 4) segments)
@@ -164,8 +226,5 @@
       
       )
 )
-
-
-
 ;(problem2 "2025/day9/test_input")
 (problem2 "2025/day9/input")
