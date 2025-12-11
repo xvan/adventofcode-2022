@@ -195,32 +195,35 @@
               (row-major-aref array i))))))
 
 (defun get-basis2 (Am)
-    (let* (
-           (A    (copy-array Am))
-           (rows (array-dimension A 0))
-           (cols (array-dimension A 0))
-           (col-candidates (loop :for x :from 0 :below cols :collect x))                   
-         )        
+  (let* (
+         (A    (copy-array Am))
+         (rows (array-dimension A 0))
+         (cols (array-dimension A 1))
+         (col-candidates (loop :for x :from 0 :below cols :collect x))
+         (basis-cols '())
+       )
+    
     (loop :for row :from 0 :below rows
-     :for current-col := (loop for col :in col-candidates :when (not (= 0 (aref A row col))) :return col)  
-     :do (setf col-candidates (remove current-col col-candidates))
-      :do (print (list col-candidates current-col row ))
-     :do (loop 
-          :for minor-col :in col-candidates          
-          :do ( loop       
-                  :with scale := (/ (aref A row minor-col) (aref A row current-col))
-                  :for minor-row :from 0 :below rows
-                  :do (decf (aref A minor-row minor-col) 
-                            (* scale (aref A minor-row current-col)))                  
-                  )
-               :finally (print (list rows cols col-candidates A))
-                )
-      :collect current-col   
-      :while col-candidates  
-      )
-      
-            )      
+          :for current-col := (loop for col :in col-candidates
+                                    :when (and col (< col cols) (not (= 0 (aref A row col))))
+                                    :return col)
+          :do (print (format-matrix A))
+          :while col-candidates
+          :do (when (null current-col)
+                (return)) ; exit loop if no pivot found
+          :do (setf col-candidates (remove current-col col-candidates))
+          :do (push current-col basis-cols)
+          :do (loop 
+                :for minor-col :in col-candidates
+                :do (loop
+                      :with scale := (/ (aref A row minor-col) (aref A row current-col))
+                      :for minor-row :from 0 :below rows
+                      :do (decf (aref A minor-row minor-col)
+                                (* scale (aref A minor-row current-col)))))
+          )
+    (nreverse basis-cols) ; return the collected pivot columns
     )
+)
 
 
 (get-basis2 #2A((1 0 1 1 0) (0 0 0 1 1) (1 1 0 1 1) (1 1 0 0 1) (1 0 1 0 1)) )
