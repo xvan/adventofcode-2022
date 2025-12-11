@@ -1,5 +1,8 @@
 ;(problem1 "2025/day10/input")      
 
+(ql:quickload "lla")
+(ql:quickload :array-operations)
+
 (defun split-integers (riv)
   (loop :with start := 0 
         :for end := (search "," riv :start2 start)
@@ -68,18 +71,18 @@
                 (truncate (ash (logxor r v) -2) c)))))
 
 
-; (defun generate-by-bitcount (n)
-;   "Return a list of all integers 0..(2^n - 1)
-;    ordered by increasing number of bits set."
-;   (let ((limit (ash 1 n))
-;         (result '()))
-;     (push 0 result)
-;     (loop for k from 1 to n do
-;       (let ((v (1- (ash 1 k))))   ; smallest number with k bits: 0...011..1
-;         (loop while (< v limit) do
-;           (push v result)
-;           (setf v (or (gospers-next v) limit)))))
-;     (nreverse result)))
+(defun generate-by-bitcount (n)
+  "Return a list of all integers 0..(2^n - 1)
+   ordered by increasing number of bits set."
+  (let ((limit (ash 1 n))
+        (result '()))
+    (push 0 result)
+    (loop for k from 1 to n do
+      (let ((v (1- (ash 1 k))))   ; smallest number with k bits: 0...011..1
+        (loop while (< v limit) do
+          (push v result)
+          (setf v (or (gospers-next v) limit)))))
+    (nreverse result)))
 
 (defun generate-by-kbitcount (n k)  
   (let ((limit (ash 1 n))        
@@ -100,16 +103,6 @@
         (setf n (logand n (1- n)))))        ; clear lowest 1-bit
     result))
 
-(mapcar #'bits-on (generate-by-kbitcount 4 2))
-
-(bits-on 0)
-
-
-(defun print-bin (n bits)
-  (format t "~v,'0b~%" bits n))
-
-(mapc (lambda (x) (print-bin x 4))
-      (generate-by-bitcount 4))
 
 
 
@@ -162,7 +155,10 @@
   (format nil "~%~{~{~a~}~%~}"  (array-to-list m))    
   )
 
-(defun get-basis (A)  
+(defun get-basis (A)
+    (print "getbasis que paso")  
+    (print A)
+    (print (lla:qr A))
     (loop 
      :with rows := (array-dimension A 0)
      :with cols := (array-dimension A 1) 
@@ -180,9 +176,60 @@
       :finally (return (list basis others))
   )
 )
+
+(defun copy-array (array &key (element-type (array-element-type array))
+                             (fill-pointer t)
+                             (adjustable t))
+  "Return a fresh copy of ARRAY with the same dimensions and contents."
+  (let ((dims (array-dimensions array)))
+    (let ((new (make-array dims
+                           :element-type element-type
+                           :adjustable (and adjustable (adjustable-array-p array))
+                           :fill-pointer (cond ((eq fill-pointer t)
+                                                (and (array-has-fill-pointer-p array)
+                                                     (fill-pointer array)))
+                                               ((numberp fill-pointer) fill-pointer)
+                                               (t nil)))))
+      (dotimes (i (array-total-size array) new)
+        (setf (row-major-aref new i)
+              (row-major-aref array i))))))
+
+(defun get-basis2 (Am)
+    (let* (
+           (A    (copy-array Am))
+           (rows (array-dimension A 0))
+           (cols (array-dimension A 0))
+           (col-candidates (loop :for x :from 0 :below cols :collect x))                   
+         )        
+    (loop :for row :from 0 :below rows
+     :for current-col := (loop for col :in col-candidates :when (not (= 0 (aref A row col))) :return col)  
+     :do (setf col-candidates (remove current-col col-candidates))
+      :do (print (list col-candidates current-col row ))
+     :do (loop 
+          :for minor-col :in col-candidates          
+          :do ( loop       
+                  :with scale := (/ (aref A row minor-col) (aref A row current-col))
+                  :for minor-row :from 0 :below rows
+                  :do (decf (aref A minor-row minor-col) 
+                            (* scale (aref A minor-row current-col)))                  
+                  )
+               :finally (print (list rows cols col-candidates A))
+                )
+      :collect current-col   
+      :while col-candidates  
+      )
+      
+            )      
+    )
+
+
+(get-basis2 #2A((1 0 1 1 0) (0 0 0 1 1) (1 1 0 1 1) (1 1 0 0 1) (1 0 1 0 1)) )
   
 
 (defun generate-basis (m basis)
+  (print "m y basis")
+  (print m)
+  (print basis)
   (let* ((rows (array-dimension m 0))
          (cols (length basis))
          (contents
@@ -190,7 +237,32 @@
                  :collect
                    (loop :for b :in basis
                          :collect (coerce (aref m x b) 'double-float)))))
-    (make-array (list rows cols) :initial-contents contents :element-type 'double-float)))
+    (make-array (list rows cols) 
+      :initial-contents contents 
+      :element-type 'double-float)))
+
+
+(defun custom-divison (a b)
+  (print a)
+  (print b)
+  (loop :for va :across a 
+          :for vb :across b
+          :collect (if (= vb 0d0) SB-EXT:DOUBLE-FLOAT-POSITIVE-INFINITY (/ va vb))
+  )
+  )
+
+(defun min-lista (estupido)
+(loop
+            :with min-tgt := SB-EXT:DOUBLE-FLOAT-POSITIVE-INFINITY 
+            :with min-idx := nil
+            :for x :from 0
+            :for tgt :in estupido
+            :when (<= tgt min-tgt)
+            :do (setf min-tgt tgt)
+            :and
+            :do (setf min-idx x)
+            :finally (return min-idx)
+          ))
 
 
 (defun problem2 (path) 
@@ -199,45 +271,69 @@
    :for machine-manual :in (read-input path)
    :for buttons := (second machine-manual)
    :for jolts :=  (third machine-manual)
-   :for vjolts := (make-array (length jolts) :initial-contents jolts)
-   :for rows := (length jolts)
-   :for cols := (length buttons)   
-   :for A := (button-array buttons rows cols)
-   :for basis := (get-basis A)
-   :for B := (generate-basis A (first basis))
-   :for invB := (lla:invert B)
-   :for cost := (make-array rows :initial-element 1d0 :element-type 'double-float)
    
-   :for u := (lla::mm cost invB)
+   :for rows := (length jolts)
+   :for cols := (length buttons)
+   
+   :for vjolts := (make-array rows :initial-contents jolts)
+    
+   :for A := (button-array buttons rows cols)
+   :for basis-and-remainder := (get-basis A)
+   :for basis := (first basis-and-remainder)
+   :for remainder := (second basis-and-remainder)
+   :do (print machine-manual)
+   :do (print (list "rows" rows))
+   :do (print (list "cols" cols))
+   :sum (loop
+      :with cost := (make-array rows :initial-element 1d0 :element-type 'double-float)            
+      :for B :=  (print (generate-basis A  basis))                  
+      :for dummy := (print (list "Bdim" (array-dimensions B) "costdim" (array-dimensions cost)))
+      :for invB := (lla:invert B)  
+      
+      :for u := (lla::mm cost invB)
+         
+      :for r := (loop for ai in remainder
+                   :collect (list (- 1 (aref (lla:mm u (generate-basis A (list ai))) 0 )) ai))
+      :for minr := (car (sort r #'< :key #'first))            
+      :for yB := (lla:mm invB vjolts)
+      :for cnt := (lla:mm cost yB)
+      :when (or (not remainder) (>= (first minr) 0))
+        :return cnt
+      
+      :do (let* (
+              (aiv (generate-basis A (list (second minr))))
+              (dB (lla:mm invB  aiv))
+              (hm (custom-divison  yB (array-operations::flatten dB)))
+              (replace-idx (min-lista hm))              
+          )          
 
-   :for r := (loop for ai in (second basis)
-                   :collect (- 1 (aref (lla:mm u (generate-basis A (list ai))) 0 ))
-                          ;  (lla:mm
-                          ;  (cl-num-utils.matrix:transpose u) 
-                          ;  (generate-basis A (list ai)))
-                           
-                   )
 
+          (print dB)          
+          (print yB)
+          (print hm)
+          (print basis)          
+          (setf (nth replace-idx basis) (second minr))
+          (print basis)
+          (print (delete (second minr) remainder))
+          
 
-   :do (print (list buttons jolts (format-matrix A) basis (format-matrix B) 
-                "dimensions"
-                (array-dimensions B)
-                ;(array-dimensions vjolts)
-                B
-                (lla:mm B vjolts)                
-                r
-                ))    
-   :return t
+          )
+      ;:do (print (list u r minr))      
+      ;:return t
+      ; :do (print (list buttons jolts (format-matrix A) basis (format-matrix B) 
+      ;           "dimensions"
+      ;           (array-dimensions B)
+      ;           ;(array-dimensions vjolts)
+      ;           (list A
+      ;           vjolts
+      ;           cost)
+      ;           B
+      ;           (lla:mm B vjolts)
+      ;           r
+      ;           ))
+      
+      )       
+   ;:return t
   ))
 
 (problem2 "2025/day10/test_input")
-
-;; Now inversion works
-(defparameter A-inv (lla:invert A))
-
-
-
-(ql:quickload "lla")
-
-(defparameter *matrix-a* (make-array '(2 2) :initial-contents '((1.0 2.0) (3.0 4.0))))
-(defparameter *vector-b* (make-array '(2) :initial-contents '(5.0 6.0)))
