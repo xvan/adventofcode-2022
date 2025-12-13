@@ -340,3 +340,44 @@
   ))
 
 (problem2 "2025/day10/test_input")
+
+(load "2025/day10/simplex.cl")
+(defun problem3 (path) 
+  
+   (loop
+   :for manual-idx :from 1    
+   :for machine-manual :in (read-input path)
+   :for buttons := (second machine-manual)
+   :for jolts :=  (third machine-manual)
+   
+   :for rows := (length jolts)
+   :for cols := (length buttons)
+   
+   :for vjolts := (make-array rows :initial-contents jolts)
+    
+   :for A := (button-array buttons rows cols)   
+   :for cost := (make-array cols :initial-element 1d0 :element-type 'double-float)            
+   :do (multiple-value-bind (s c1) (simplex A vjolts cost)
+       (when s 
+       (print (list manual-idx c1 machine-manual)))
+       
+       )
+      ;:do (print (list u r minr))      
+      ;:return t
+      ; :do (print (list buttons jolts (format-matrix A) basis (format-matrix B) 
+      ;           "dimensions"
+      ;           (array-dimensions B)
+      ;           ;(array-dimensions vjolts)
+      ;           (list A
+      ;           vjolts
+      ;           cost)
+      ;           B
+      ;           (lla:mm B vjolts)
+      ;           r
+      ;           ))
+      
+      )       
+   ;:return t
+  )
+
+(problem3 "2025/day10/input")

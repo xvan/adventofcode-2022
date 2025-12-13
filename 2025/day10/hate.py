@@ -1,5 +1,8 @@
+from exceptiongroup import catch
 import numpy as np
-import scipy as sp
+import itertools
+import pprint
+
 
 def parse_line(line):
     # Find and extract the curly braces content (always at the end)
@@ -102,12 +105,12 @@ def gaussian_elimination(A, b, demo_mode=False):
                     print(f"Eliminated row {j} using row {pivot_row} with factor {factor}")
                     print(M)
     
-    return M, b, row_pivots, col_pivots
+    return M, b, sorted(row_pivots), sorted(col_pivots)
 
 
 import numpy as np
 
-def simplex_phase2(A, b, c, basis, demo_mode=True):
+def simplex_phase2(A, b, c, basis, demo_mode=False):
     A = np.array(A, float)
     b = np.array(b, float)
     c = np.array(c, float)
@@ -158,33 +161,117 @@ def simplex_phase2(A, b, c, basis, demo_mode=True):
         basis[leaving_row] = entering
 
 
-if __name__ == "__main__":
-    input_file = 'input'
-    output = read_input(input_file)
-    A, k = output[1]
-    print("Matrix A:")
-    print(A)
-    print("Rank of A:")
-    print(np.linalg.matrix_rank(A))
-    print("Vector k:")
-    print(k)
-    M, b, row_pivots, col_pivots = gaussian_elimination(A, k, demo_mode=True)
-    print("Row echelon form of A:")
-    print(M)
-    print("Transformed vector b:")
-    print(b)
-    print("Row pivots:", row_pivots)
-    print("Column pivots:", col_pivots)
-    print("Reduced submatrix:")
+def bruteforce(A,k):
+    
+    m, n = A.shape
+    combinations = list( itertools.combinations(range(n), m))
+    
+    solutions = []
+    solidx = []
+    retrace = []
+    
+    try:        
+        #print(combinations)
+        for id,cols in enumerate(combinations):
+            submatrix = A[:, cols]
+            if np.linalg.matrix_rank(submatrix) != m:
+                retrace.append((cols, None))
+                continue
+                
+                basis_sol = np.linalg.solve(submatrix, k)                
+            else: 
+                basis_sol = np.linalg.inv(submatrix) @ k
+            retrace.append((cols, basis_sol))
+            jj = [abs(x - round(x)) < 1e-4 and x >= -1e-4 for x in basis_sol.squeeze()]
+            # print (jj)
+            # print(basis_sol)
+            if np.all(jj):
+                solutions.append(np.sum(basis_sol))
+                solidx.append(id)
+                
+        min_sol_idx =np.argmin(solutions)
+        return (solutions[min_sol_idx], retrace[solidx[min_sol_idx]])
+
+    except Exception as e:        
+        np.set_printoptions(threshold=np.inf, linewidth=200, precision=2, suppress=True)
+        msg = ("\nBrute force failed!\n"
+            "Trace (all attempts):\n"
+            f"{pprint.pformat(retrace, indent=2)}\n"
+            f"Full trace length: {len(retrace)}\n")
+        raise Exception(msg) from e
+    
+    
+def diagnose(A, k, tol=1e-9):
+    print("rank(A) =", np.linalg.matrix_rank(A))
+    A_aug = np.hstack([A, k.reshape(-1,1)])
+    print("rank([A|k]) =", np.linalg.matrix_rank(A_aug))
+    # least squares / residual
+    x, *_ = np.linalg.lstsq(A, k, rcond=None)
+    res = np.linalg.norm(A.dot(x) - k)
+    
+    return x, res
+
+import math
+
+def solve_one(input, n=0):
+    A, k = input
+        # print("Matrix A:")
+        # print(A)
+        # print("Rank of A:")
+        # print(np.linalg.matrix_rank(A))
+        # print("Vector k:")
+        # print(k)
+    M, b, row_pivots, col_pivots = gaussian_elimination(A, k, demo_mode=False)
+        # print("Row echelon form of A:")
+        # print(M)
+        # print("Transformed vector b:")
+        # print(b)
+        # print("Row pivots:", row_pivots)
+        # print("Column pivots:", col_pivots)
+        # print("Reduced submatrix:")
     Ar = A[row_pivots,:]
-    print(Ar)
-    print("Reduced Basis A")
-    print(Ar[:, col_pivots])
+        # print(Ar)
+        # print("Reduced Basis A")
+        # print(Ar[:, col_pivots])
     kr = k[row_pivots]        
-    print("Reduced k")
-    print(kr)    
-    x, objective = simplex_phase2(Ar, kr, np.ones(Ar.shape[1]), basis=col_pivots)
-    print("Optimal solution x:")
-    print(x)
-    print("Optimal objective value:")
-    print(objective)
+        # print("Reduced k")
+        # print(kr)
+    try:
+        objective, other = bruteforce(Ar, kr)
+    except Exception as e:            
+            #x, res = diagnose(A, k)
+        msg = (f"\nBrute force failed on input line {n+1}\n"
+                   f"Matrix A:\n{pprint.pformat(A)}\n"
+                   f"Vector k: {pprint.pformat(k)}\n"
+                   f"Row pivots: {row_pivots}\n"                   
+                   f"Rank of A: {np.linalg.matrix_rank(A)}\n"
+                   f"Matrix A.T:\n{pprint.pformat(A.T)}\n"
+                   #f"least-squares residual ||A x - k|| = {res}\n"
+                   #f"Least-squares solution x:\n{pprint.pformat(x)}\n"
+                   #f"Exception: {e}\n"
+                   )
+        raise Exception(msg) from e
+        
+    print(f"Input line {n+1}: Optimal objective = {objective}")
+    print(other)
+    return objective
+
+if __name__ == "__main__":
+    input_file = '2025/day10/input'
+    #input_file = '2025/day10/test_input'
+    inputs = read_input(input_file)
+    
+    print("Total input lines:", len(inputs))
+    print("Sample input line 1 matrix A and vector k:", inputs[0])
+    all_comb = [math.comb(len(b),len(c)) for b,c in inputs] # to test parsing
+    max_dix = np.argmax(all_comb)
+    print("Max combinations in input line", max_dix+1, "with", all_comb[max_dix], "combinations")
+    
+    solution = 0
+
+    objective = solve_one(inputs[8], 0)    
+    # for n,input in enumerate(inputs):        
+    #     objective = solve_one(input, n)
+    #     solution += objective
+        
+    # print("Final solution:", solution)
