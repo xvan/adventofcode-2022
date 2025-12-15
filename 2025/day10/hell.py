@@ -3,6 +3,15 @@ import numpy as np
 from hsnf import smith_normal_form
 import sympy as sp
 
+debug_mode = True
+
+def dpprint(*args, **kwargs):
+    if debug_mode:
+        sp.pprint(*args, **kwargs)
+
+def dprint(*args, **kwargs):
+    if debug_mode:
+        print(*args, **kwargs)
 
 def gaussian_elimination(A, b, demo_mode=False):
     n = len(b)
@@ -24,7 +33,7 @@ def gaussian_elimination(A, b, demo_mode=False):
         
         if pivot_row is None:
             if demo_mode:
-                print(f"Skipping column {col}, no pivot found")
+                dprint(f"Skipping column {col}, no pivot found")
             continue
         
         row_pivots.append(pivot_row)
@@ -32,7 +41,7 @@ def gaussian_elimination(A, b, demo_mode=False):
         used_rows.add(pivot_row)
         
         if demo_mode:
-            print(f"Using row {pivot_row} as pivot for column {col}")
+            dprint(f"Using row {pivot_row} as pivot for column {col}")
         
         # Elimination - eliminate this column in ALL other rows (not just below)
         for j in range(n):
@@ -41,8 +50,8 @@ def gaussian_elimination(A, b, demo_mode=False):
                 M[j] = M[j] - factor * M[pivot_row]
                 b[j] = b[j] - factor * b[pivot_row]
                 if demo_mode:
-                    print(f"Eliminated row {j} using row {pivot_row} with factor {factor}")
-                    print(M)
+                    dprint(f"Eliminated row {j} using row {pivot_row} with factor {factor}")
+                    dprint(M)
     
     return M, b, sorted(row_pivots), sorted(col_pivots)
 
@@ -89,179 +98,199 @@ def bruteforce(M, k):
     return all_solutions
 
 
-###################################
-
-M_reduced, k_reduced, row_pivots, col_pivots = gaussian_elimination(M, k, demo_mode=False)
-
-print("Reduced Matrix M:")
-print(M_reduced)
-print("Reduced k:")
-print(k_reduced)
-print("Row pivots:", row_pivots)
-print("Column pivots:", col_pivots)
+def test_integer(solution):
+    dprint("Testing solution for integrality:")
+    dpprint(solution)
+    for val in solution:
+        if not np.isclose(val, int(val),1e-7):
+            return False
+    return True
 
 ###################################
+def solve_integer_program(M, k):
+    M_reduced, k_reduced, row_pivots, col_pivots = gaussian_elimination(M, k, demo_mode=False)
 
-Mr = M[row_pivots,:]
-kr = k[row_pivots]
+    dprint("Reduced Matrix M:")
+    dprint(M_reduced)
+    dprint("Reduced k:")
+    dprint(k_reduced)
+    dprint("Row pivots:", row_pivots)
+    dprint("Column pivots:", col_pivots)
 
-#sp.pprint(spMr[:,col_pivots].inv()@spkr)
-solutions = bruteforce(Mr, kr)
+    ###################################
 
-print("Total brute-force solutions found:", len(solutions))
+    Mr = M[row_pivots,:]
+    kr = k[row_pivots]
 
-integer_solutions = [(col_base, solution) for col_base, solution in solutions if all(x.is_integer for x in solution)]
-print("Integer brute-force solutions found:", len(integer_solutions))
+    #dpprint(spMr[:,col_pivots].inv()@spkr)
+    solutions = bruteforce(Mr, kr)
 
-print("less negative integer solutions")
-sorted_solutions = sorted([(sum(x for x in solution if x<0), col_base, solution) for col_base, solution in integer_solutions if any(x<0 for x in solution)], key=lambda t: t[0], reverse=True)
+    for solution in solutions:
+        dpprint(solution)
+
+
+    dprint("Total brute-force solutions found:", len(solutions))
+
+    integer_solutions = [(col_base, solution) for col_base, solution in solutions if test_integer(solution)]
+    dprint("Integer brute-force solutions found:", len(integer_solutions))
+    dpprint(integer_solutions)
+    #test x >= 0 with float tolerance
+    non_negative_solutions = [(col_base, solution) for col_base, solution in integer_solutions if all(x >= -1e-4 for x in solution)]
+    
+    
+    if non_negative_solutions:
+        dprint("Non-negative integer solutions found:", len(non_negative_solutions))
+        min_solution = np.argmin(np.sum(solution) for col_base, solution in non_negative_solutions)
+        dprint("Minimum objective value (non-negative):", np.sum(non_negative_solutions[min_solution][1]))
+        dprint("Solution vector (non-negative):", non_negative_solutions[min_solution][1])
+        return np.sum(non_negative_solutions[min_solution][1])    
+       
+
+    dprint("less negative integer solutions")
+    sorted_solutions = sorted([(sum(x for x in solution if x<0), col_base, solution) for col_base, solution in integer_solutions if any(x<0 for x in solution)], key=lambda t: t[0], reverse=True)
+            
+
+    dprint("Best integer solutions:")
+    for neg_sum, col_base, solution in sorted_solutions[:5]:
+        dprint("Negative sum:", neg_sum)
+        dprint("Column base:", col_base)
+        dpprint(solution)
+
+
+
+
+    ncnt, test_columns, test_reduced_solution = sorted_solutions[0]
+    x_particular = np.zeros(M.shape[1],dtype=int)
+    for i, col in enumerate(test_columns):
+        x_particular[col] = test_reduced_solution[i]
+
+    dprint("Test solution check M @ x:")
+    residual = M @ x_particular - k
+    dpprint(residual)
+            
+
+    # Smith normal form D, and unimodular matrices L and R such that L @ M @ R == D
+    D, L, R = smith_normal_form(M)
+
+    dprint("Smith Normal Form D:")
+    dprint(D)
+    # Output:
+    # Smith Normal Form D:
+    # [[   1    0    0    0]
+    #  [   0    3    0    0]
+    #  [   0    0 2079    0]]
+
+    # Verify the decomposition
+    assert np.allclose(L @ M @ R, D)
+
+
+    rank = sum(D[i, i] != 0 for i in range(min(D.shape)))
+
+    null_cols = range(rank, D.shape[1])
+    integer_null_basis = R[:, null_cols]
+
+    dprint("Integer null space basis:")
+    dprint(integer_null_basis)
+
+    general_solution = lambda zvals: x_particular + integer_null_basis @ np.array(zvals, dtype=int)
+
+
+    dprint( general_solution([-1, -1, 0]) > 0)
+
+    Z_max = np.max(k)
+
+    nns = []
+    for z0 in range(-Z_max, Z_max+1):
+        for z1 in range(-Z_max, Z_max+1):
+            for z2 in range(-Z_max, Z_max+1):            
+                x = general_solution([z0, z1, z2])
+                if np.all(x >= 0):
+                    nns.append(x)
+                    dpprint(x)
+
+    dprint("Total non-negative integer solutions found:", len(nns))
+    a_solution = np.argmin(np.sum(x) for x in nns)
+    dprint("Minimum objective value:", np.sum(nns[a_solution]))
+    dprint("Solution vector:", nns[a_solution])
+
+    assert(np.all(M @ nns[a_solution] == k))
+
+    return np.sum(nns[a_solution])
+
+
+
+
+def parse_line(line):
+    # Find and extract the curly braces content (always at the end)
+    curly_start = line.rfind('{')
+    curly_end = line.rfind('}')
+    curly_content = [int(x.strip()) for x in line[curly_start+1:curly_end].split(',')]
+    
+    # Remove curly braces part from line
+    line_without_curly = line[:curly_start].strip()
+    
+    # Skip the first square brackets
+    first_bracket_end = line_without_curly.find(']')
+    remaining = line_without_curly[first_bracket_end+1:].strip()
+    
+    # Parse all parentheses groups
+    parentheses_groups = []
+    i = 0
+    while i < len(remaining):
+        if remaining[i] == '(':
+            # Find matching closing parenthesis
+            end = remaining.find(')', i)
+            content = remaining[i+1:end]
+            if content.strip():  # Not empty
+                group = [int(x.strip()) for x in content.split(',')]
+                parentheses_groups.append(group)
+            i = end + 1
+        else:
+            i += 1
+    
+    return parentheses_groups, curly_content
+
+
+def build_matrix_A(paren_lists, curly_list):
+    total_rows = len(curly_list)
+    total_cols = len(paren_lists)
+    
+    A = np.zeros((total_rows, total_cols))
+    
+
+    for col_idx, paren_group in enumerate(paren_lists):
+        for row_idx in paren_group:
+            A[row_idx, col_idx] = 1  # Adjust for 0-based index
+
+    return A
+
+
+def read_input(file_path):
+    output = []
+    with open(file_path, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                paren_lists, curly_list = parse_line(line)                
+                A = build_matrix_A(paren_lists, curly_list)
+                
+                k = np.array(curly_list)
+                
+                output.append((A, k))
+    return output         
+
+#print ( solve_integer_program(M, k))
+
+if __name__ == "__main__":
+    input_file = '2025/day10/input'
+    #input_file = '2025/day10/test_input'
+    inputs = read_input(input_file)
+    solution = 0
+    for n,input in enumerate(inputs):
+        if n != 7:
+            continue 
+        print(f"Processing input #{n+1}")              
+        objective = solve_integer_program(input[0], input[1])
+        solution += objective
         
-
-print("Best integer solutions:")
-for neg_sum, col_base, solution in sorted_solutions[:5]:
-    print("Negative sum:", neg_sum)
-    print("Column base:", col_base)
-    sp.pprint(solution)
-
-
-
-
-ncnt, test_columns, test_reduced_solution = sorted_solutions[0]
-x_particular = np.zeros(M.shape[1],dtype=int)
-for i, col in enumerate(test_columns):
-    x_particular[col] = test_reduced_solution[i]
-
-print("Test solution check M @ x:")
-residual = M @ x_particular - k
-sp.pprint(residual)
-        
-
-# Smith normal form D, and unimodular matrices L and R such that L @ M @ R == D
-D, L, R = smith_normal_form(M)
-
-print("Smith Normal Form D:")
-print(D)
-# Output:
-# Smith Normal Form D:
-# [[   1    0    0    0]
-#  [   0    3    0    0]
-#  [   0    0 2079    0]]
-
-# Verify the decomposition
-assert np.allclose(L @ M @ R, D)
-
-
-rank = sum(D[i, i] != 0 for i in range(min(D.shape)))
-
-null_cols = range(rank, D.shape[1])
-integer_null_basis = R[:, null_cols]
-
-print("Integer null space basis:")
-print(integer_null_basis)
-
-general_solution = lambda zvals: x_particular + integer_null_basis @ np.array(zvals, dtype=int)
-
-
-print( general_solution([-1, -1, 0]) > 0)
-
-Z_max = np.max(k)
-
-nns = []
-for z0 in range(-Z_max, Z_max+1):
-    for z1 in range(-Z_max, Z_max+1):
-        for z2 in range(-Z_max, Z_max+1):            
-            x = general_solution([z0, z1, z2])
-            if np.all(x >= 0):
-                nns.append(x)
-                sp.pprint(x)
-
-print("Total non-negative integer solutions found:", len(nns))
-a_solution = np.argmin(np.sum(x) for x in nns)
-print("Minimum objective value:", np.sum(nns[a_solution]))
-print("Solution vector:", nns[a_solution])
-
-assert(np.all(M @ nns[a_solution] == k))
-
-
-
-# z = sp.symbols(f'z0:{M.shape[1]-rank}', integer=True)
-# zvec = sp.Matrix(len(z), 1, z)
-
-# x_general = sp.Matrix(x_particular) + integer_null_basis * zvec
-
-# print("General integer solution:")
-# sp.pprint(x_general)
-
-
-# # x = x_general.subs({z[0]: 1, z[1]: 1, z[2]: 1})
-# # sp.pprint(x)
-
-# girder_solutions = []
-# for z0 in range(-2, 3):
-#     for z1 in range(-2, 3):
-#         for z2 in range(-2, 3):            
-#             x = x_general.subs({z[0]: z0, z[1]: z1, z[2]: z2})
-#             girder_solutions.append(x)
-
-# sp.pprint(girder_solutions)
-# ############################################
-# A = np.array([
-#     [6, 10, 16],
-#     [4, 14, 22]
-# ],dtype=int)
-
-# D, U, V = smith_normal_form(A)
-
-# print("U =")
-# print(U)
-# print("D =")
-# print(D)
-# print("V =")
-# print(V)
-
-
-# # Verify the decomposition
-# assert np.allclose(U @ A @ V, D)
-
-
-# rank = sum(D[i, i] != 0 for i in range(min(D.shape)))
-
-# null_cols = range(rank, D.shape[1])
-# integer_null_basis = V[:, null_cols]
-
-# print("Integer null space basis:")
-# print(integer_null_basis)
-
-# b = sp.Matrix([2, 4])
-
-# c = U * b
-
-# # Check divisibility
-# for i in range(rank):
-#     if c[i] % D[i, i] != 0:
-#         raise ValueError("No integer solutions")
-
-# # Particular solution
-# y = sp.zeros(A.shape[1], 1)
-# for i in range(rank):
-#     y[i] = c[i] // D[i, i]
-
-# x_particular = V * y
-# print("One integer particular solution:")
-# print(x_particular)
-
-# # General solution
-# z = sp.symbols(f'z0:{A.shape[1]-rank}', integer=True)
-
-# print("this is z")
-# sp.pprint(z)
-# print("this is rank")
-# print(rank)
-# print("this is y before")
-# sp.pprint(y)
-# for k, zi in enumerate(z):
-#     y[rank + k] = zi
-# x_general = V * y
-
-# print("General integer solution:")
-# print(x_general)
+    print("Final solution:", solution)
